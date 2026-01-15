@@ -107,10 +107,17 @@ export function useAudio() {
         };
     }, []);
 
-    const setStep = (step) => {
+    const setStep = useCallback((step) => {
         stepRef.current = step;
         setCurrentStep(step);
-    };
+    }, []);
 
-    return { isLoaded, isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep };
+    const playNote = useCallback((instrument) => {
+        if (!isLoaded || !players.current) return;
+        if (players.current.has(instrument)) {
+            players.current.player(instrument).start(Tone.now());
+        }
+    }, [isLoaded]);
+
+    return { isLoaded, isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep, playNote };
 }

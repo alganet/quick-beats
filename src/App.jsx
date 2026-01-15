@@ -16,7 +16,7 @@ import { COMMON_SIGNATURES } from './data/signatures'
 import { encodeGrid, decodeGrid } from './utils/hashState'
 
 function App() {
-  const { isLoaded, isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep } = useAudio();
+  const { isLoaded, isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep, playNote } = useAudio();
   const isInternalUpdate = useRef(false);
 
   const [isSetup, setIsSetup] = useState(false);
@@ -143,6 +143,11 @@ function App() {
   };
 
   const toggleStep = (row, col) => {
+    const isActivating = !grid[row][col];
+    if (isActivating) {
+      playNote(INSTRUMENTS[row]);
+    }
+
     const newGrid = grid.map((r, rIdx) => {
       if (rIdx === row) {
         return r.map((c, cIdx) => (cIdx === col ? !c : c));
