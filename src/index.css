@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: ISC
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
   --bg-dark: #0f172a;
