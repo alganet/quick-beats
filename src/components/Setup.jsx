@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { COMMON_SIGNATURES } from '../data/signatures';
+import { Icon } from './Icons';
 
 export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) {
     return (
@@ -16,7 +17,8 @@ export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) 
             </button>
             <div className="max-w-2xl w-full">
                 <div className="text-center mb-8 md:mb-16">
-                    <h1 className="text-6xl font-black tracking-tighter text-white mb-4 uppercase">
+                    <h1 className="text-6xl font-black tracking-tighter text-white mb-4 uppercase flex items-center justify-center gap-4">
+                        <Icon id="logo" className="w-12 h-12 text-[#3b82f6]" />
                         Quick Beats
                     </h1>
                     <p className="text-slate-500 text-sm font-mono uppercase tracking-[0.2em]">Select Tempo & Preview</p>

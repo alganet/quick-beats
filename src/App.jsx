@@ -174,6 +174,7 @@ function App() {
   if (!isSetup) {
     return (
       <>
+        <IconSprite />
         <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         <Setup
           onSelect={handlePreview}
@@ -198,7 +199,8 @@ function App() {
             >
               Back
             </button>
-            <h1 className="text-xl md:text-2xl font-black tracking-tighter text-white uppercase">
+            <h1 className="text-xl md:text-2xl font-black tracking-tighter text-white uppercase flex items-center gap-2">
+              <Icon id="logo" className="w-6 h-6 text-[#3b82f6]" />
               Quick Beats
             </h1>
           </div>

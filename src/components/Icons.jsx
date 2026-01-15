@@ -6,6 +6,20 @@ import React from 'react';
 
 export const IconSprite = () => (
     <svg xmlns="http://www.w3.org/2000/svg" style={{ display: 'none' }}>
+        <symbol id="icon-logo" viewBox="0 0 24 24">
+            {/* Crossed Drumsticks (Background) */}
+            <path d="M4 20L20 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.4" />
+            <path d="M20 20L4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.4" />
+            {/* Drum Shell */}
+            <path d="M2 7.5V16.5C2 19.5 12 21.5 22 16.5V7.5" stroke="currentColor" strokeWidth="2" fill="none" />
+            {/* Top Rim & Head */}
+            <ellipse cx="12" cy="7.5" rx="10" ry="4" stroke="currentColor" strokeWidth="2" fill="none" />
+            <ellipse cx="12" cy="7.5" rx="8" ry="3" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
+            {/* Tension Rods */}
+            <path d="M6 10.5V18.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M12 11.5V20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M18 10.5V18.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </symbol>
         <symbol id="icon-play" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" fill="currentColor" />
         </symbol>
