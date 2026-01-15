@@ -25,7 +25,14 @@ export function useAudio() {
             players.current.dispose();
         }
 
-        const newPlayers = new Tone.Players(kit.samples).toDestination();
+        const resolvedSamples = {};
+        Object.entries(kit.samples).forEach(([name, path]) => {
+            // Remove leading slash if present and prepend BASE_URL
+            const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+            resolvedSamples[name] = `${import.meta.env.BASE_URL}${cleanPath}`;
+        });
+
+        const newPlayers = new Tone.Players(resolvedSamples).toDestination();
         players.current = newPlayers;
 
         await Tone.loaded();
