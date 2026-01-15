@@ -1,0 +1,70 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Alexandre Gomes Gaigalas <alganet@gmail.com>
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-dark: #0f172a;
+  --bg-panel: #1e293b;
+  --primary: #fda4af;
+  /* Soft Pink / Neon Red-ish */
+  --accent: #22d3ee;
+  /* Cyan */
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --grid-cell: #334155;
+  --grid-active: #f43f5e;
+  --playhead: #fbbf24;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --bg-dark: #0a0a0a;
+  --bg-panel: #141414;
+  --bg-element: #1e1e1e;
+  --border-dim: #333333;
+  --border-medium: #444444;
+
+  --rgb-red: #ff3e3e;
+  --rgb-green: #22c55e;
+  --rgb-blue: #3b82f6;
+  --rgb-white: #f8fafc;
+  --text-muted: #64748b;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--bg-dark)] text-slate-100 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Glassmorphism utilities */
+.glass-panel {
+  @apply bg-[#141414] border border-[#333] shadow-xl;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[#333] rounded-full hover:bg-[#444] transition-colors;
+}
