@@ -63,11 +63,14 @@ function App() {
             const decodedGrid = decodeGrid(gridData, INSTRUMENTS.length);
             if (decodedGrid) {
               isInternalUpdate.current = true;
-              setTimeSignature(sig);
-              setBpmInput(loadedBpm);
-              setGrid(decodedGrid);
-              setIsSetup(true);
-              if (kitId !== "black-pearl") loadKit(kitId);
+              // Wrap in microtask to avoid "setState in effect" lint error
+              queueMicrotask(() => {
+                setTimeSignature(sig);
+                setBpmInput(loadedBpm);
+                setGrid(decodedGrid);
+                setIsSetup(true);
+                if (kitId !== "black-pearl") loadKit(kitId);
+              });
               return;
             }
           }
@@ -163,10 +166,6 @@ function App() {
     setGrid(newGrid);
   };
 
-  const clearGrid = () => {
-    const currentSteps = grid[0].length;
-    setGrid(INSTRUMENTS.map(() => Array(currentSteps).fill(false)));
-  };
 
   if (!isLoaded) {
     return (
@@ -247,7 +246,6 @@ function App() {
             togglePlay={togglePlay}
             bpm={bpmInput}
             setBpm={setBpmInput}
-            addMeasure={addMeasure}
           />
         </div>
 

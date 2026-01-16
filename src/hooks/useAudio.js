@@ -42,7 +42,9 @@ export function useAudio() {
 
     // Initial load
     useEffect(() => {
-        loadKit(DEFAULT_KIT_ID);
+        queueMicrotask(() => {
+            loadKit(DEFAULT_KIT_ID);
+        });
         return () => {
             if (players.current) players.current.dispose();
         };

@@ -5,7 +5,7 @@
 import React from "react";
 import { Icon } from "./Icons";
 
-export default function Controls({ isPlaying, togglePlay, bpm, setBpm, addMeasure }) {
+export default function Controls({ isPlaying, togglePlay, bpm, setBpm }) {
 
     return (
         <div className="flex flex-row items-center gap-4 md:gap-8 mb-4 p-3 bg-[#141414] border border-[#333]">
@@ -23,7 +23,6 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm, addMeasur
                 >
                     <Icon id={isPlaying ? "stop" : "play"} className="w-5 h-5" />
                 </button>
-
             </div>
 
             {/* Tempo Slider: Right / Auto-filling middle space */}
