@@ -13,12 +13,12 @@ export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) 
                 onClick={onShowHelp}
                 className="absolute top-4 right-6 text-slate-700 hover:text-white transition-colors font-mono text-[10px] uppercase tracking-tighter"
             >
-                v1.0.2
+                v1.0.3
             </button>
             <div className="max-w-2xl w-full">
                 <div className="text-center mb-8 md:mb-16">
-                    <h1 className="text-6xl font-black tracking-tighter text-white mb-4 uppercase flex items-center justify-center gap-4">
-                        <Icon id="logo" className="w-12 h-12 text-[#3b82f6]" />
+                    <h1 className="text-4xl font-black tracking-tighter text-white mb-4 uppercase flex items-center justify-center gap-3">
+                        <Icon id="logo" className="w-16 h-16" />
                         Quick Beats
                     </h1>
                     <p className="text-slate-500 text-sm font-mono uppercase tracking-[0.2em]">Select Tempo & Preview</p>
@@ -31,21 +31,21 @@ export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) 
                             <button
                                 key={sig.name}
                                 onClick={() => onSelect(sig)}
-                                className={`group relative flex flex-col items-start p-6 rounded-none bg-[#141414] border transition-all text-left ${isSelected ? 'border-[#3b82f6] ring-1 ring-[#3b82f6]' : 'border-[#333] hover:border-slate-500'
+                                className={`group relative flex flex-col items-start p-6 rounded-none bg-[#141414] border transition-all text-left ${isSelected ? 'border-[#22d3ee] ring-1 ring-[#22d3ee]' : 'border-[#333] hover:border-slate-500'
                                     }`}
                             >
                                 <div className="flex items-center justify-between w-full mb-2">
-                                    <span className={`text-3xl font-bold transition-colors ${isSelected ? 'text-[#3b82f6]' : 'text-white'}`}>
+                                    <span className={`text-3xl font-bold transition-colors ${isSelected ? 'text-[#22d3ee]' : 'text-white'}`}>
                                         {sig.name}
                                     </span>
-                                    <span className={`px-2 py-0.5 border text-[9px] uppercase tracking-widest font-mono ${isSelected ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-[#333] text-slate-500'
+                                    <span className={`px-2 py-0.5 border text-[9px] uppercase tracking-widest font-mono ${isSelected ? 'border-[#22d3ee] text-[#22d3ee]' : 'border-[#333] text-slate-500'
                                         }`}>
                                         {sig.label}
                                     </span>
                                 </div>
                                 <p className="text-slate-600 text-xs font-mono lowercase">{sig.description}</p>
                                 {isSelected && (
-                                    <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#3b82f6] animate-pulse" />
+                                    <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
                                 )}
                             </button>
                         );

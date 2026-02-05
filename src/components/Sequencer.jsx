@@ -123,24 +123,29 @@ export default function Sequencer({ grid, toggleStep, currentStep, stepCount = 1
                                         <Icon id={INSTRUMENT_ICONS[instrument] || 'kick'} className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
                                     </div>
                                     <div className="flex-1 flex h-full relative p-0.5 md:p-1 gap-1">
-                                        {grid[rowIdx] && grid[rowIdx].map((isActive, colIdx) => (
-                                            <div
-                                                key={colIdx}
-                                                onMouseDown={() => toggleStep(rowIdx, colIdx)}
-                                                className={`flex-none w-10 cursor-pointer transition-all duration-75 relative
+                                        {grid[rowIdx] && grid[rowIdx].map((isActive, colIdx) => {
+                                            const isPlaying = isActive && colIdx === currentStep;
+                                            return (
+                                                <div
+                                                    key={colIdx}
+                                                    onMouseDown={() => toggleStep(rowIdx, colIdx)}
+                                                    className={`flex-none w-10 cursor-pointer transition-all duration-75 relative rounded-md
                             ${(colIdx + 1) % grouping === 0 ? 'mr-4' : ''}
-                            ${isActive
-                                                        ? "bg-[#3b82f6]"
-                                                        : "bg-[#1e1e1e] hover:bg-[#262626]"}
+                            ${isPlaying
+                                                            ? "bg-[#22d3ee] shadow-[0_0_12px_rgba(34,211,238,0.5)]"
+                                                            : isActive
+                                                                ? "bg-[#3b82f6]"
+                                                                : "bg-[#222] hover:bg-[#444]"}
                             ${colIdx % stepsPerMeasure === 0 ? 'ring-1 ring-inset ring-white/5' : ''}
                             `}
-                                            >
-                                                {/* Beat indicator dot for measure starts */}
-                                                {colIdx % stepsPerMeasure === 0 && !isActive && (
-                                                    <div className="absolute top-1 right-1 w-1 h-1 rounded-full bg-[#333]" />
-                                                )}
-                                            </div>
-                                        ))}
+                                                >
+                                                    {/* Beat indicator dot for measure starts */}
+                                                    {colIdx % stepsPerMeasure === 0 && !isActive && (
+                                                        <div className="absolute top-1 right-1 w-1 h-1 rounded-full bg-[#333]" />
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             ))}

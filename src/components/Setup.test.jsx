@@ -90,7 +90,7 @@ describe('Setup', () => {
         const onShowHelp = vi.fn();
         renderWithSprite(<Setup {...defaultProps} onShowHelp={onShowHelp} />);
 
-        const versionButton = screen.getByText('v1.0.2');
+        const versionButton = screen.getByText('v1.0.3');
         fireEvent.click(versionButton);
 
         expect(onShowHelp).toHaveBeenCalledTimes(1);
@@ -102,7 +102,7 @@ describe('Setup', () => {
 
         const fourFourButton = screen.getByText('4/4').closest('button');
         // Check that it has the selected border class
-        expect(fourFourButton).toHaveClass('border-[#3b82f6]');
+        expect(fourFourButton).toHaveClass('border-[#22d3ee]');
     });
 
     it('should show pulse indicator on selected signature', () => {

@@ -8,7 +8,7 @@ import { Icon } from "./Icons";
 export default function Controls({ isPlaying, togglePlay, bpm, setBpm }) {
 
     return (
-        <div className="flex flex-row items-center gap-4 md:gap-8 mb-4 p-3 bg-[#141414] border border-[#333]">
+        <div className="flex flex-row items-center gap-4 md:gap-8 mb-2 p-0 max-w-[400px]">
             {/* Buttons Group: Left */}
             <div className="flex items-center gap-2 md:gap-3">
                 {/* Play/Stop Button */}
@@ -26,13 +26,13 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm }) {
             </div>
 
             {/* Tempo Slider: Right / Auto-filling middle space */}
-            <div className="flex-1 flex items-center justify-end gap-3 md:gap-6 ml-auto">
-                <div className="flex flex-col items-end gap-0.5 min-w-[50px] md:min-w-[60px]">
+            <div className="flex-1 flex items-center justify-end gap-3 ml-auto">
+                <div className="flex flex-col items-end gap-0.5 min-w-[30px] md:min-w-[40px]">
                     <span className="text-[8px] md:text-[9px] font-mono uppercase text-slate-500 tracking-tighter">Tempo</span>
                     <span className="text-white text-[10px] font-mono leading-none tracking-tighter">{bpm} <span className="hidden md:inline">BPM</span></span>
                 </div>
 
-                <div className="w-full max-w-[100px] md:max-w-[200px]">
+                <div className="w-full">
                     <input
                         type="range"
                         min="60"
