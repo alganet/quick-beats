@@ -224,7 +224,7 @@ function App() {
               className="hidden md:block text-slate-600 hover:text-white transition-colors font-mono text-[10px] uppercase tracking-tighter"
               title="Project Info & Help"
             >
-              v1.0.2
+              v1.0.3
             </button>
           </div>
         </header>
