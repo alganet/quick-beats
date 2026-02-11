@@ -26,9 +26,24 @@ function App() {
   const [previewSig, setPreviewSig] = useState(null);
   const [bpmInput, setBpmInput] = useState(120);
   const [grid, setGrid] = useState([]);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(() => {
+    const saved = localStorage.getItem('qb-auto-scroll');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [canScroll, setCanScroll] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(() => {
+    const saved = localStorage.getItem('qb-zoom');
+    return saved !== null ? parseInt(saved, 10) : 1;
+  });
+
+  // Persist UI preferences
+  useEffect(() => {
+    localStorage.setItem('qb-auto-scroll', JSON.stringify(autoScroll));
+  }, [autoScroll]);
+
+  useEffect(() => {
+    localStorage.setItem('qb-zoom', zoom.toString());
+  }, [zoom]);
 
   // Handle ESC key for modals
   useEffect(() => {
@@ -210,7 +225,7 @@ function App() {
               className="hidden md:block text-slate-600 hover:text-white transition-colors font-mono text-[10px] uppercase tracking-tighter"
               title="Project Info & Help"
             >
-              v1.1.0
+              v1.1.1
             </button>
             <button
               onClick={() => setIsShareOpen(true)}
