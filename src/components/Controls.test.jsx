@@ -64,7 +64,7 @@ describe('Controls', () => {
             <Controls isPlaying={false} togglePlay={togglePlay} bpm={140} setBpm={setBpm} />
         );
 
-        expect(screen.getByText('140')).toBeInTheDocument();
+        expect(screen.getByText(/140/)).toBeInTheDocument();
     });
 
     it('should render tempo slider with correct value', () => {
@@ -104,5 +104,61 @@ describe('Controls', () => {
         const slider = screen.getByRole('slider');
         expect(slider).toHaveAttribute('min', '60');
         expect(slider).toHaveAttribute('max', '200');
+    });
+
+    it('should render auto-scroll toggle', () => {
+        const togglePlay = vi.fn();
+        const setBpm = vi.fn();
+        const setAutoScroll = vi.fn();
+
+        renderWithSprite(
+            <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={true} />
+        );
+
+        const toggle = screen.getByRole('button', { name: /toggle auto-scroll/i });
+        expect(toggle).toBeInTheDocument();
+        expect(toggle).toHaveAttribute('title', 'Auto-scroll ON');
+    });
+
+    it('should call setAutoScroll when toggle is clicked', () => {
+        const togglePlay = vi.fn();
+        const setBpm = vi.fn();
+        const setAutoScroll = vi.fn();
+
+        renderWithSprite(
+            <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={true} />
+        );
+
+        const toggle = screen.getByRole('button', { name: /toggle auto-scroll/i });
+        fireEvent.click(toggle);
+
+        expect(setAutoScroll).toHaveBeenCalled();
+    });
+    it('should NOT render auto-scroll toggle when canScroll is false', () => {
+        const togglePlay = vi.fn();
+        const setBpm = vi.fn();
+        const setAutoScroll = vi.fn();
+
+        renderWithSprite(
+            <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={false} />
+        );
+
+        const toggle = screen.queryByRole('button', { name: /toggle auto-scroll/i });
+        expect(toggle).not.toBeInTheDocument();
+    });
+
+    it('should call setZoom when zoom toggle is clicked', () => {
+        const togglePlay = vi.fn();
+        const setBpm = vi.fn();
+        const setZoom = vi.fn();
+
+        renderWithSprite(
+            <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} zoom={1} setZoom={setZoom} />
+        );
+
+        const zoomToggle = screen.getByRole('button', { name: /toggle zoom/i });
+        fireEvent.click(zoomToggle);
+
+        expect(setZoom).toHaveBeenCalled();
     });
 });

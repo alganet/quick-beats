@@ -66,3 +66,82 @@ button {
 ::-webkit-scrollbar-thumb {
   @apply bg-[#333] rounded-full hover:bg-[#444] transition-colors;
 }
+
+/* Custom Range Input (Slider) */
+input[type="range"].custom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Track: webkit */
+input[type="range"].custom-slider::-webkit-slider-runnable-track {
+  background: #1e1e1e;
+  height: 4px;
+  border-radius: 2px;
+}
+
+@keyframes pulse-opacity {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-opacity 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Track: moz */
+input[type="range"].custom-slider::-moz-range-track {
+  background: #1e1e1e;
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Thumb: webkit */
+input[type="range"].custom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  /* Centers thumb on the track */
+  background-color: #3b82f6;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+  border: 2px solid #0a0a0a;
+}
+
+/* Thumb: moz */
+input[type="range"].custom-slider::-moz-range-thumb {
+  background-color: #3b82f6;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  border: 2px solid #0a0a0a;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+/* Hover/Active states */
+input[type="range"].custom-slider:hover::-webkit-slider-thumb {
+  background-color: #60a5fa;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+  transform: scale(1.1);
+}
+
+input[type="range"].custom-slider:active::-webkit-slider-thumb {
+  background-color: #2563eb;
+  transform: scale(0.95);
+}

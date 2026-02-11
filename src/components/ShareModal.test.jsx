@@ -79,17 +79,23 @@ describe('ShareModal', () => {
         expect(screen.getByText('Copied')).toBeInTheDocument();
     });
 
-    it('should display instructions', () => {
+    it('should display sharing options', () => {
         render(<ShareModal {...defaultProps} />);
 
-        expect(screen.getByText(/copy the link above/i)).toBeInTheDocument();
-        expect(screen.getByText(/anyone with the link/i)).toBeInTheDocument();
-    });
+        expect(screen.getByText(/instantly share with one click:/i)).toBeInTheDocument();
+        expect(screen.getByText(/or copy the direct link:/i)).toBeInTheDocument();
 
-    it('should display step numbers', () => {
-        render(<ShareModal {...defaultProps} />);
+        // Check social links exist
+        const twitterLink = screen.getByRole('link', { name: /x/i });
+        const whatsappLink = screen.getByRole('link', { name: /whatsapp/i });
+        const telegramLink = screen.getByRole('link', { name: /telegram/i });
 
-        expect(screen.getByText('1')).toBeInTheDocument();
-        expect(screen.getByText('2')).toBeInTheDocument();
+        expect(twitterLink).toBeInTheDocument();
+        expect(whatsappLink).toBeInTheDocument();
+        expect(telegramLink).toBeInTheDocument();
+
+        expect(twitterLink).toHaveAttribute('href', expect.stringContaining('twitter.com'));
+        expect(whatsappLink).toHaveAttribute('href', expect.stringContaining('whatsapp.com'));
+        expect(telegramLink).toHaveAttribute('href', expect.stringContaining('t.me'));
     });
 });

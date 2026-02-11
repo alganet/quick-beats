@@ -5,7 +5,7 @@
 import React from "react";
 import { Icon } from "./Icons";
 
-export default function Controls({ isPlaying, togglePlay, bpm, setBpm }) {
+export default function Controls({ isPlaying, togglePlay, bpm, setBpm, autoScroll, setAutoScroll, canScroll, zoom, setZoom }) {
 
     return (
         <div className="flex flex-row items-center gap-4 md:gap-8 mb-2 p-0 max-w-[400px]">
@@ -25,23 +25,47 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm }) {
                 </button>
             </div>
 
-            {/* Tempo Slider: Right / Auto-filling middle space */}
+            {/* Controls Group: Right */}
             <div className="flex-1 flex items-center justify-end gap-3 ml-auto">
-                <div className="flex flex-col items-end gap-0.5 min-w-[30px] md:min-w-[40px]">
-                    <span className="text-[8px] md:text-[9px] font-mono uppercase text-slate-500 tracking-tighter">Tempo</span>
-                    <span className="text-white text-[10px] font-mono leading-none tracking-tighter">{bpm} <span className="hidden md:inline">BPM</span></span>
+
+                <div className="flex flex-col items-end gap-0.5 min-w-[20px] md:min-w-[20px] select-none">
+                    <span className="text-white text-[10px] font-mono leading-none tracking-tighter">{bpm} BPM</span>
                 </div>
 
-                <div className="w-full">
+                <div className="w-full mr-2">
                     <input
                         type="range"
                         min="60"
                         max="200"
                         value={bpm}
                         onChange={(e) => setBpm(parseInt(e.target.value))}
-                        className="w-full h-1 bg-[#1e1e1e] appearance-none cursor-pointer accent-[#3b82f6]"
+                        className="custom-slider"
                     />
                 </div>
+
+                {/* Auto-scroll Toggle - Only visible when scrolling is possible */}
+                {canScroll && (
+                    <button
+                        onClick={() => setAutoScroll(!autoScroll)}
+                        className={`flex-none w-8 h-8 flex items-center justify-center transition-all rounded-md ${autoScroll
+                            ? "bg-white text-[#0a0a0a] shadow-[0_0_12px_rgba(255,255,255,0.3)]"
+                            : "bg-[#222] text-slate-500 hover:text-slate-300"
+                            } hover:scale-105 active:scale-95`}
+                        title={autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
+                        aria-label="Toggle auto-scroll"
+                    >
+                        <Icon id={autoScroll ? "follow" : "unfollow"} className="w-4 h-4" />
+                    </button>
+                )}
+                {/* Zoom Toggle */}
+                <button
+                    onClick={() => setZoom((zoom + 1) % 3)}
+                    className="flex-none w-8 h-8 flex items-center justify-center transition-all rounded-md bg-[#222] text-slate-400 hover:text-white hover:scale-105 active:scale-95"
+                    title="Change Zoom Level"
+                    aria-label="Toggle Zoom"
+                >
+                    <Icon id={`zoom-${zoom}`} className="w-5 h-5" />
+                </button>
             </div>
         </div>
     );

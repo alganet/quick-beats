@@ -26,6 +26,9 @@ function App() {
   const [previewSig, setPreviewSig] = useState(null);
   const [bpmInput, setBpmInput] = useState(120);
   const [grid, setGrid] = useState([]);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [canScroll, setCanScroll] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
   // Handle ESC key for modals
   useEffect(() => {
@@ -196,35 +199,32 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex-none my-2 mx-4 md:mx-6 flex items-center justify-between border-b border-[#1e1e1e] pb-2">
           <div className="flex items-center gap-4">
-            <button
-              onClick={handleReset}
-              className="text-[10px] font-mono text-slate-500 hover:text-white transition-colors border border-[#333] px-2 py-1 uppercase tracking-tighter"
-              title="Exit to Setup"
-            >
-              Back
-            </button>
-            <h1 className="text-xl md:text-2xl font-black tracking-tighter text-white uppercase flex items-center gap-2">
-              <Icon id="logo" className="w-6 h-6 text-[#3b82f6]" />
+            <h1 className="text-xl md:text-2xl font-black tracking-tighter text-white uppercase flex items-center gap-2 select-none pb-0.5">
+              <Icon id="logo" className="w-6 h-6 text-[#3b82f6] mt-0.5" />
               Quick Beats
             </h1>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
             <button
-              onClick={() => setIsShareOpen(true)}
-              className="p-1.5 md:p-2 text-slate-500 hover:text-[#3b82f6] transition-colors"
-              title="Share Pattern"
-            >
-              <Icon id="share" className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            </button>
-            <span className="px-2 py-0.5 border border-[#333] text-[9px] text-[#3b82f6] font-mono tracking-widest uppercase">
-              {timeSignature.name}
-            </span>
-            <button
               onClick={() => setIsHelpOpen(true)}
               className="hidden md:block text-slate-600 hover:text-white transition-colors font-mono text-[10px] uppercase tracking-tighter"
               title="Project Info & Help"
             >
-              v1.0.3
+              v1.1.0
+            </button>
+            <button
+              onClick={() => setIsShareOpen(true)}
+              className="text-[10px] font-bold font-mono text-slate-500 hover:text-white transition-colors border border-[#333] px-2 py-1 uppercase tracking-tighter"
+              title="Share Pattern"
+            >
+              <Icon id="share" className="w-3.5 h-3.5 md:w-3 md:h-3 inline align-text-bottom" /> Share Beat
+            </button>
+            <button
+              onClick={handleReset}
+              className="text-[10px] font-mono text-slate-500 hover:text-white transition-colors border border-[#333] px-2 py-1 uppercase tracking-tighter"
+              title="Go Back to Setup"
+            >
+              Home
             </button>
           </div>
         </header>
@@ -246,10 +246,16 @@ function App() {
             togglePlay={togglePlay}
             bpm={bpmInput}
             setBpm={setBpmInput}
+            autoScroll={autoScroll}
+            setAutoScroll={setAutoScroll}
+            canScroll={canScroll}
+            zoom={zoom}
+            setZoom={setZoom}
           />
         </div>
 
         <Sequencer
+          isPlaying={isPlaying}
           grid={grid}
           toggleStep={toggleStep}
           currentStep={currentStep}
@@ -259,6 +265,10 @@ function App() {
           beatsPerMeasure={timeSignature.beats}
           stepsPerBeat={timeSignature.stepsPerBeat}
           grouping={timeSignature.grouping}
+          autoScroll={autoScroll}
+          setAutoScroll={setAutoScroll}
+          setCanScroll={setCanScroll}
+          zoom={zoom}
         />
 
       </div>

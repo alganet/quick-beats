@@ -29,31 +29,42 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
                     </button>
                 </div>
 
-                <p className="text-slate-400 text-xs font-mono uppercase tracking-widest mb-4">
-                    Link generated with tempo and pattern data:
+                <p className="text-slate-400 text-[10px] font-mono uppercase tracking-widest mb-4">
+                    Instantly share with one click:
                 </p>
 
-                <div className="flex gap-2 mb-6">
-                    <div className="flex-1 bg-[#0a0a0a] border border-[#333] px-3 py-2 text-[10px] font-mono text-slate-300 truncate">
-                        {shareUrl}
-                    </div>
-                    <button
-                        onClick={handleCopy}
-                        className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${copied ? 'bg-green-600 text-white' : 'bg-[#3b82f6] text-white hover:bg-[#2563eb]'
-                            }`}
-                    >
-                        {copied ? 'Copied' : 'Copy'}
-                    </button>
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                    {[
+                        { id: 'x', label: 'X', color: 'hover:bg-slate-800', url: `https://twitter.com/intent/tweet?text=Check out this beat I made on Quick Beats!&url=${encodeURIComponent(shareUrl)}` },
+                        { id: 'whatsapp', label: 'WhatsApp', color: 'hover:bg-green-600', url: `https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this beat I made on Quick Beats! ${shareUrl}`)}` },
+                        { id: 'telegram', label: 'Telegram', color: 'hover:bg-sky-500', url: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent('Check out this beat I made on Quick Beats!')}` }
+                    ].map((platform) => (
+                        <a
+                            key={platform.id}
+                            href={platform.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`flex flex-col items-center justify-center gap-2 p-3 border border-[#333] ${platform.color} transition-all group`}
+                        >
+                            <Icon id={platform.id} className="w-5 h-5 text-slate-400 group-hover:text-white" />
+                            <span className="text-[9px] font-mono uppercase tracking-tighter text-slate-500 group-hover:text-white">{platform.label}</span>
+                        </a>
+                    ))}
                 </div>
 
-                <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-[#1e1e1e] text-[10px] font-bold text-[#3b82f6]">1</div>
-                        <p className="text-xs text-slate-400 leading-relaxed">Copy the link above to share your specific tempo, time signature, and arrangement.</p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-[#1e1e1e] text-[10px] font-bold text-[#3b82f6]">2</div>
-                        <p className="text-xs text-slate-400 leading-relaxed">Anyone with the link can open the pattern directly in their browser—no login required.</p>
+                <div className="pt-6 border-t border-[#1e1e1e]">
+                    <p className="text-slate-500 text-[9px] font-mono uppercase tracking-tighter mb-3">Or copy the direct link:</p>
+                    <div className="flex gap-1">
+                        <div className="flex-1 bg-[#0a0a0a] border border-[#333] px-3 py-1.5 text-[10px] font-mono text-slate-400 truncate flex items-center">
+                            {shareUrl}
+                        </div>
+                        <button
+                            onClick={handleCopy}
+                            className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${copied ? 'bg-green-600 text-white' : 'bg-[#1e1e1e] text-slate-400 hover:text-white hover:bg-[#333]'
+                                }`}
+                        >
+                            {copied ? 'Copied' : 'Copy'}
+                        </button>
                     </div>
                 </div>
 
