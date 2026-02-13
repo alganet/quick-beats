@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: ISC
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Icon } from './Icons';
 
 export default function ShareModal({ isOpen, onClose, shareUrl }) {

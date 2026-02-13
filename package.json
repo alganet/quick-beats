@@ -1,7 +1,7 @@
 {
   "name": "quick-beats",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:run": "vitest run",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

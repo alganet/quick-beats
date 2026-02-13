@@ -11,7 +11,7 @@ export const KITS = {
             "Hi-Hat Closed": "/samples/BLACK_PEARL_2023_repack/42-Sabian-13-HatClosed-1.wav",
             "Hi-Hat Open": "/samples/BLACK_PEARL_2023_repack/46-Sabian-13-HatSemi-1.wav",
             Tom: "/samples/BLACK_PEARL_2023_repack/45-Pearl-12-Tom-1.wav",
-            Crash: "/samples/BLACK_PEARL_2023_repack/49-SabianAA-16-Crash-1.wav",
+            Crash: "/samples/BLACK_PEARL_2023_repack/49-SabianAA-16-Crash-4.wav",
             Ride: "/samples/BLACK_PEARL_2023_repack/51-SabianAAX-20-Ride-1.wav",
         }
     }

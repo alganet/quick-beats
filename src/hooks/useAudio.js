@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: ISC
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { startTransition, useEffect, useState, useRef, useCallback } from "react";
 import * as Tone from "tone";
 import { KITS, INSTRUMENTS, DEFAULT_KIT_ID } from "../data/kit";
 
@@ -15,12 +15,16 @@ export function useAudio() {
     const sequence = useRef(null);
     const gridRef = useRef([]);
     const stepRef = useRef(0);
+    const isLoadedRef = useRef(false);
+    const perfTickRef = useRef(0);
+    const wakeLockRef = useRef(null);
 
     const loadKit = useCallback(async (kitId) => {
         const kit = KITS[kitId];
         if (!kit) return;
 
         setIsLoaded(false);
+        isLoadedRef.current = false;
         if (players.current) {
             players.current.dispose();
         }
@@ -37,41 +41,88 @@ export function useAudio() {
 
         await Tone.loaded();
         setIsLoaded(true);
+        isLoadedRef.current = true;
         setActiveKit(kitId);
     }, []);
 
-    // Initial load
+    // Ensure players are cleaned up on unmount. Kit loading is done lazily
+    // to avoid creating/resuming an AudioContext before a user gesture (browser
+    // autoplay policy triggers a console warning otherwise).
     useEffect(() => {
-        queueMicrotask(() => {
-            loadKit(DEFAULT_KIT_ID);
-        });
         return () => {
             if (players.current) players.current.dispose();
         };
-    }, [loadKit]);
+    }, []);
 
     const updateGrid = useCallback((newGrid) => {
         gridRef.current = newGrid;
     }, []);
 
-    const togglePlay = async () => {
-        if (!isLoaded) return;
+    const togglePlay = useCallback(async () => {
+        // Lazy-load the default kit on first user-driven playback so we don't
+        // create or resume the AudioContext during page load (avoids browser
+        // autoplay warnings).
+        if (!isLoadedRef.current) {
+            await loadKit(DEFAULT_KIT_ID);
+        }
 
         if (Tone.getTransport().state === "started") {
+            // Pause playback but preserve the current playhead position so resume
+            // continues from the same step. `handleReset` is responsible for
+            // explicitly resetting to step 0.
             Tone.getTransport().stop();
             setIsPlaying(false);
-            setCurrentStep(0);
-            stepRef.current = 0; // Reset step ref
         } else {
             await Tone.start();
             Tone.getTransport().start();
             setIsPlaying(true);
         }
-    };
+    }, [loadKit]);
 
-    const setBpm = (bpm) => {
+    const setBpm = useCallback((bpm) => {
         Tone.getTransport().bpm.value = bpm;
-    };
+    }, []);
+
+    // Keep the screen awake while the sequencer is playing (Screen Wake Lock API - best-effort)
+    useEffect(() => {
+        let visibilityHandler;
+
+        const requestWakeLock = async () => {
+            if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return;
+            try {
+                const sentinel = await navigator.wakeLock.request('screen');
+                wakeLockRef.current = sentinel;
+                if (sentinel && typeof sentinel.addEventListener === 'function') {
+                    sentinel.addEventListener('release', () => { wakeLockRef.current = null; });
+                }
+            } catch {
+                // best-effort; ignore failures
+            }
+        };
+
+        const releaseWakeLock = async () => {
+            if (wakeLockRef.current && typeof wakeLockRef.current.release === 'function') {
+                try { await wakeLockRef.current.release(); } catch { /* ignore */ }
+                wakeLockRef.current = null;
+            }
+        };
+
+        if (isPlaying) {
+            requestWakeLock();
+            visibilityHandler = () => {
+                if (!document.hidden && isPlaying && !wakeLockRef.current) requestWakeLock();
+            };
+            document.addEventListener('visibilitychange', visibilityHandler);
+        } else {
+            // ensure lock is released when playback stops
+            releaseWakeLock();
+        }
+
+        return () => {
+            if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
+            releaseWakeLock();
+        };
+    }, [isPlaying]);
 
     useEffect(() => {
         // Use a Loop instead of Sequence to handle dynamic grid lengths
@@ -81,19 +132,50 @@ export function useAudio() {
 
             const totalSteps = currentGrid[0]?.length || 16;
             const step = stepRef.current; // Read current step
+            const perfEnabled = import.meta.env.DEV
+                && typeof window !== "undefined"
+                && window.__QB_PERF__ === true
+                && typeof performance !== "undefined"
+                && typeof performance.mark === "function"
+                && typeof performance.measure === "function";
+
+            let audioMarkName;
+            let uiMarkName;
+            let measureName;
+            if (perfEnabled) {
+                const tickId = perfTickRef.current++;
+                audioMarkName = `qb-audio-${tickId}`;
+                uiMarkName = `qb-ui-${tickId}`;
+                measureName = `qb-audio-to-ui-${tickId}`;
+                performance.mark(audioMarkName);
+            }
 
             // Trigger sounds for this step
             INSTRUMENTS.forEach((instrument, rowIndex) => {
                 if (currentGrid[rowIndex] && currentGrid[rowIndex][step]) {
                     if (players.current && players.current.has(instrument)) {
-                        players.current.player(instrument).start(time, 0);
+                        try {
+                            players.current.player(instrument).start(time, 0);
+                        } catch {
+                            console.warn("Skipped a beat due to audio playback isssue");
+                        }
                     }
                 }
             });
 
             // Schedule UI update
             Tone.getDraw().schedule(() => {
-                setCurrentStep(step);
+                if (perfEnabled) {
+                    performance.mark(uiMarkName);
+                    performance.measure(measureName, audioMarkName, uiMarkName);
+                    performance.clearMarks(audioMarkName);
+                    performance.clearMarks(uiMarkName);
+                    performance.clearMeasures(measureName);
+                }
+
+                startTransition(() => {
+                    setCurrentStep((previousStep) => (previousStep === step ? previousStep : step));
+                });
             }, time);
 
             // Increment for next loop
@@ -117,7 +199,7 @@ export function useAudio() {
     const playNote = useCallback((instrument) => {
         if (!isLoaded || !players.current) return;
         if (players.current.has(instrument)) {
-            players.current.player(instrument).start(Tone.now());
+            players.current.player(instrument).start();
         }
     }, [isLoaded]);
 
