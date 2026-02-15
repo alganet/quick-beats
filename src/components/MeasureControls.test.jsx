@@ -34,7 +34,7 @@ describe('MeasureControls', () => {
 
     it('renders correct number of delete buttons', () => {
         render(<MeasureControls {...defaultProps} measureCount={3} />);
-        const buttons = screen.getAllByText('🗙');
+        const buttons = screen.getAllByText('x');
         expect(buttons).toHaveLength(3);
     });
 
@@ -42,7 +42,7 @@ describe('MeasureControls', () => {
         const setPendingDelete = vi.fn();
         render(<MeasureControls {...defaultProps} setPendingDelete={setPendingDelete} />);
         
-        const buttons = screen.getAllByText('🗙');
+        const buttons = screen.getAllByText('x');
         fireEvent.click(buttons[0]);
         
         expect(setPendingDelete).toHaveBeenCalledWith(0);
@@ -65,7 +65,7 @@ describe('MeasureControls', () => {
         scrollContainer.scrollTo = scrollTo;
         scrollContainer.getBoundingClientRect = vi.fn(() => ({ left: 10, width: 300 }));
 
-        const firstDeleteIcon = screen.getAllByText('🗙')[0];
+        const firstDeleteIcon = screen.getAllByText('x')[0];
         const firstMeasureControl = firstDeleteIcon.closest('[data-measure-control-index="0"]');
         firstMeasureControl.getBoundingClientRect = vi.fn(() => ({ left: 330, width: 60 }));
 
@@ -80,7 +80,7 @@ describe('MeasureControls', () => {
         
         expect(screen.getByTestId('confirm-bar')).toBeInTheDocument();
         // The second measure (index 1) should show confirm bar, others show minus
-        const minusButtons = screen.getAllByText('🗙');
+        const minusButtons = screen.getAllByText('x');
         expect(minusButtons).toHaveLength(1); // 2 measures total, 1 pending = 1 minus visible
     });
 

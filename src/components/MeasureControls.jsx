@@ -103,7 +103,7 @@ export function MeasureControls({
                                 </StickyWrapper>
                             ) : (
                                 <StickyIconWrapper>
-                                    <span className="align-baseline text-sm transition-transform group-hover:-translate-y-0.5">🗙</span>
+                                    <span className="align-baseline text-md font-bold transition-transform group-hover:-translate-y-0.5">x</span>
                                 </StickyIconWrapper>
                             )}
                         </div>
