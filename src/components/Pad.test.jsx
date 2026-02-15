@@ -99,9 +99,9 @@ describe('Pad', () => {
         }));
     });
 
-    it('prevents page scroll on touch (touch-action none)', () => {
+    it('prevents vertical page scroll on touch (touch-action pan-x)', () => {
         render(<Pad {...defaultProps} />);
         const pad = screen.getByTestId('pad');
-        expect(pad).toHaveClass('touch-none');
+        expect(pad).toHaveClass('touch-pan-x');
     });
 });

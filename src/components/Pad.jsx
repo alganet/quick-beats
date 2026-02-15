@@ -30,7 +30,7 @@ export const Pad = ({ isActive, rowIdx, colIdx, grouping, config, toggleStep, se
         <div
             ref={padRef}
             {...longPressHandlers}
-            className={`flex-none cursor-pointer touch-none relative ${config.radiusClass}
+            className={`flex-none cursor-pointer touch-pan-x relative ${config.radiusClass}
                 ${isActive
                     ? "bg-[#3b82f6]"
                     : "bg-[#222] hover:bg-[#444]"}
