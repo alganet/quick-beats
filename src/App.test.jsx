@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import App from './App';
+import { encodeGrid } from './utils/hashState';
+import { INSTRUMENTS } from './data/kit';
 
 // Mocks
 const mockUseAudio = {
@@ -101,6 +103,48 @@ describe('App', () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
         expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+    });
+
+    it('reads valid URL hash on initial render and shows main sequencer (no setup flash)', () => {
+        // Build an empty grid matching the number of instruments for 4/4 (16 steps)
+        const rows = INSTRUMENTS.length;
+        const steps = 16;
+        const grid = Array.from({ length: rows }, () => Array.from({ length: steps }, () => false));
+        const encoded = encodeGrid(grid);
+
+        window.location.hash = `#120|4/4|black-pearl|${encoded}|v1`;
+
+        render(<App />);
+
+        // Setup should NOT be shown and Sequencer should mount with the decoded grid
+        expect(screen.queryByTestId('mock-setup')).not.toBeInTheDocument();
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+        expect(mockUseAudio.updateGrid).toHaveBeenCalledWith(grid);
+    });
+
+    it('updates URL hash after loading from a shared URI when grid changes', () => {
+        vi.useFakeTimers();
+
+        // Arrange: start from a shared hash
+        const rows = INSTRUMENTS.length;
+        const steps = 16;
+        const grid = Array.from({ length: rows }, () => Array.from({ length: steps }, () => false));
+        const encoded = encodeGrid(grid);
+        window.location.hash = `#120|4/4|black-pearl|${encoded}|v1`;
+
+        render(<App />);
+
+        // Sanity: sequencer mounted
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+
+        // Act: toggle a step and advance timers past the hash-sync delay
+        fireEvent.click(screen.getByTestId('toggle-step-btn'));
+        vi.advanceTimersByTime(250);
+
+        // Assert: URL fragment has been updated (grid portion changed)
+        expect(window.location.hash).toMatch(/^#\d+\|4\/4\|black-pearl\|\d+\.[A-Za-z0-9\-_]+\|v1$/);
+
+        vi.useRealTimers();
     });
 
     it('handles signature selection and preview', () => {
@@ -324,6 +368,25 @@ describe('App', () => {
         // Should play note and update grid
         expect(mockUseAudio.playNote).toHaveBeenCalled();
         expect(mockUseAudio.updateGrid).toHaveBeenCalled();
+    });
+
+    it('updates URL hash when grid changes', () => {
+        vi.useFakeTimers();
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+
+        // Enter main screen
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // Toggle a step and advance timers past the hash-sync delay
+        fireEvent.click(screen.getByTestId('toggle-step-btn'));
+        vi.advanceTimersByTime(250);
+
+        // hash includes encoded grid + version suffix
+        // Expect kit segment + grid columns + encoded data + version
+        expect(window.location.hash).toMatch(/^#\d+\|4\/4\|black-pearl\|\d+\.[A-Za-z0-9\-_]+\|v1$/);
+        vi.useRealTimers();
     });
 
     it('bulk updates steps via Sequencer cb', () => {

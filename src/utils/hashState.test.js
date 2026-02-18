@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { describe, it, expect } from 'vitest';
-import { encodeGrid, decodeGrid } from './hashState';
+import { encodeGrid, decodeGrid, buildShareHash, parseShareHash } from './hashState';
 
 describe('hashState', () => {
     describe('encodeGrid', () => {
@@ -132,6 +132,42 @@ describe('hashState', () => {
                     true, false, false, false, false, false, false, false, false, false],
             ];
             expect(decodeGrid(encodeGrid(pattern20), 1)).toEqual(pattern20);
+        });
+    });
+
+    describe('share hash helpers', () => {
+        it('builds and parses a full share hash (with kit + version)', () => {
+            const rows = 3;
+            const cols = 16;
+            const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
+            grid[0][0] = true;
+
+            const hash = buildShareHash({ bpm: 120, sigName: '4/4', kitId: 'black-pearl', grid });
+            expect(hash).toMatch(/^120\|4\/4\|black-pearl\|\d+\./);
+
+            const parsed = parseShareHash(hash, rows);
+            expect(parsed).not.toBeNull();
+            expect(parsed.bpm).toBe(120);
+            expect(parsed.sigName).toBe('4/4');
+            expect(parsed.kitId).toBe('black-pearl');
+            expect(parsed.grid).toEqual(grid);
+        });
+
+        it('parses legacy short format (no kit segment)', () => {
+            const rows = 2;
+            const grid = [
+                [true, false, false, false],
+                [false, true, false, false],
+            ];
+            const encodedGrid = encodeGrid(grid);
+            const shortHash = `120|4/4|${encodedGrid}`;
+
+            const parsed = parseShareHash(shortHash, rows);
+            expect(parsed).not.toBeNull();
+            expect(parsed.bpm).toBe(120);
+            expect(parsed.sigName).toBe('4/4');
+            expect(parsed.kitId).toBe('black-pearl');
+            expect(parsed.grid).toEqual(grid);
         });
     });
 });

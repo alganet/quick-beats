@@ -13,7 +13,7 @@ import { IconSprite, Icon } from './components/Icons'
 import { INSTRUMENTS } from './data/kit'
 import { BACKBEATS } from './data/patterns'
 import { COMMON_SIGNATURES } from './data/signatures'
-import { decodeGrid, encodeGrid } from './utils/hashState';
+import { parseShareHash, buildShareHash } from './utils/hashState';
 import {
   calculateBulkUpdate,
   calculateGridWithRemovedMeasure,
@@ -26,20 +26,28 @@ const ACTION_DELAY_MS = 200;
 const HASH_SYNC_DELAY_MS = 180;
 
 function App() {
-  const { isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep, playNote } = useAudio();
-  const isInternalUpdate = useRef(false);
+  const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote } = useAudio();
+  const lastHashRef = useRef(typeof window !== 'undefined' && window.location.hash ? window.location.hash.substring(1) : '');
   const bpmApplyTimeoutRef = useRef(null);
   const hashSyncTimeoutRef = useRef(null);
   const keyboardZoomTimeoutRef = useRef(null);
   const keyboardAutoScrollTimeoutRef = useRef(null);
 
-  const [isSetup, setIsSetup] = useState(false);
+  const _parsedHash = typeof window !== 'undefined'
+    ? parseShareHash(window.location.hash.substring(1), INSTRUMENTS.length)
+    : null;
+
+  const _initialHash = _parsedHash && COMMON_SIGNATURES.find(s => s.name === _parsedHash.sigName)
+    ? { success: true, bpm: _parsedHash.bpm, sig: COMMON_SIGNATURES.find(s => s.name === _parsedHash.sigName), kitId: _parsedHash.kitId, grid: _parsedHash.grid }
+    : null;
+
+  const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [timeSignature, setTimeSignature] = useState(null);
-  const [previewSig, setPreviewSig] = useState(null);
-  const [bpmInput, setBpmInput] = useState(120);
-  const [grid, setGrid] = useState([]);
+  const [timeSignature, setTimeSignature] = useState(_initialHash?.sig ?? null);
+  const [previewSig, setPreviewSig] = useState(_initialHash?.sig ?? null);
+  const [bpmInput, setBpmInput] = useState(_initialHash?.bpm ?? 120);
+  const [grid, setGrid] = useState(_initialHash?.grid ?? []);
   const [autoScroll, setAutoScroll] = useState(() => {
     const saved = localStorage.getItem('qb-auto-scroll');
     return saved !== null ? JSON.parse(saved) : true;
@@ -73,13 +81,8 @@ function App() {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       const mq = window.matchMedia('(pointer: fine)');
       const handler = (ev) => setShowKeyboardCheatsheet(ev.matches);
-      // Some environments use addListener/removeListener
-      if (mq.addEventListener) mq.addEventListener('change', handler);
-      else mq.addListener(handler);
-      return () => {
-        if (mq.removeEventListener) mq.removeEventListener('change', handler);
-        else mq.removeListener(handler);
-      };
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
     }
     return undefined;
   }, []);
@@ -169,64 +172,19 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, setBpmInput, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle]);
 
-  // Load state from Hash initially
-  useEffect(() => {
-    const hash = window.location.hash.substring(1);
-    if (hash) {
-      try {
-        const parts = hash.split('|');
-        if (parts.length >= 4) {
-          const loadedBpm = parseInt(parts[0]);
-          const sigName = parts[1];
-          let kitId = "black-pearl";
-          let gridData = "";
-
-          if (parts.length === 4) {
-            gridData = parts[2];
-          } else {
-            kitId = parts[2];
-            gridData = parts[3];
-          }
-
-          const sig = COMMON_SIGNATURES.find(s => s.name === sigName);
-          if (sig) {
-            const decodedGrid = decodeGrid(gridData, INSTRUMENTS.length);
-            if (decodedGrid) {
-              isInternalUpdate.current = true;
-              // Wrap in microtask to avoid "setState in effect" lint error
-              queueMicrotask(() => {
-                setTimeSignature(sig);
-                setBpmInput(loadedBpm);
-                setGrid(decodedGrid);
-                setIsSetup(true);
-                if (kitId !== "black-pearl") loadKit(kitId);
-              });
-              return;
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Failed to parse hash state", e);
-      }
-    }
-  }, [loadKit]);
-
   // Update hash when state changes
   useEffect(() => {
     if (isSetup && timeSignature && grid.length > 0) {
-      if (isInternalUpdate.current) {
-        isInternalUpdate.current = false;
-        return;
-      }
-
       if (hashSyncTimeoutRef.current) {
         clearTimeout(hashSyncTimeoutRef.current);
       }
 
       hashSyncTimeoutRef.current = setTimeout(() => {
-        const gridHash = encodeGrid(grid);
-        const hash = `${bpmInput}|${timeSignature.name}|${activeKit}|${gridHash}|v1`;
-        window.history.replaceState(null, '', `#${hash}`);
+        const hash = buildShareHash({ bpm: bpmInput, sigName: timeSignature.name, kitId: activeKit, grid });
+        if (hash !== lastHashRef.current) {
+          window.history.replaceState(null, '', `#${hash}`);
+          lastHashRef.current = hash;
+        }
         hashSyncTimeoutRef.current = null;
       }, HASH_SYNC_DELAY_MS);
     }
@@ -319,8 +277,6 @@ function App() {
   const removeMeasure = (measureIndex) => {
     setGrid(prevGrid => calculateGridWithRemovedMeasure(prevGrid, measureIndex, timeSignature));
   };
-
-
 
   if (!isSetup) {
     return (

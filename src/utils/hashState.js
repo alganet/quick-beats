@@ -72,3 +72,46 @@ export const decodeGrid = (encoded, expectedRows) => {
         return null;
     }
 };
+
+export const buildShareHash = ({ bpm, sigName, kitId = 'black-pearl', grid }) => {
+    const gridHash = encodeGrid(grid);
+    // format: bpm|signature|kit|cols.base64|v1
+    return `${bpm}|${sigName}|${kitId}|${gridHash}|v1`;
+};
+
+export const parseShareHash = (hash, expectedRows) => {
+    if (!hash) return null;
+    // allow leading '#'
+    const raw = hash.startsWith('#') ? hash.substring(1) : hash;
+    const parts = raw.split('|');
+    if (parts.length < 3) return null; // must contain at least bpm and signature
+
+    const bpm = parseInt(parts[0], 10);
+    if (Number.isNaN(bpm)) return null;
+
+    const sigName = parts[1];
+
+    let kitId = 'black-pearl';
+    let gridData = '';
+
+    // two supported shapes:
+    //  - bpm|sig|cols.base64       (legacy/short)
+    //  - bpm|sig|kit|cols.base64|v1 (full)
+    if (parts.length === 3) {
+        gridData = parts[2];
+    } else if (parts.length >= 4) {
+        // When a kit is provided the grid is the next segment. Ignore trailing
+        // version segment if present.
+        if (parts.length === 4) {
+            gridData = parts[2];
+        } else {
+            kitId = parts[2];
+            gridData = parts[3];
+        }
+    }
+
+    const grid = decodeGrid(gridData, expectedRows);
+    if (!grid) return null;
+
+    return { bpm, sigName, kitId, grid };
+};
