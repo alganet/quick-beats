@@ -300,8 +300,8 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex-none flex items-center justify-between px-2 py-1 md:px-6 md:py-3">
           <div className="flex items-center gap-4">
-            <h1 className="text-md md:text-2xl font-black tracking-tighter text-white uppercase flex items-center gap-2 select-none">
-              <Icon id="logo" className="w-6 h-6 md:w-8 md:h-8 text-[#3b82f6] md:mt-0.5" />
+            <h1 className="text-md md:text-xl font-black tracking-tighter text-white uppercase flex items-center gap-2 select-none">
+              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 text-[#3b82f6] md:mt-0.5" />
               Quick Beats
             </h1>
           </div>
