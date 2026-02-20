@@ -259,6 +259,40 @@ describe('useAudio', () => {
         expect(mockPlayersInstance.player).not.toHaveBeenCalled();
     });
 
+    it('ignores stale scheduled UI updates after manual seek', async () => {
+        const scheduledCallbacks = [];
+        Tone.getDraw.mockReturnValue({
+            schedule: vi.fn((cb) => {
+                scheduledCallbacks.push(cb);
+            })
+        });
+
+        const { result } = renderHook(() => useAudio());
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+
+        act(() => {
+            result.current.updateGrid([[true, false]]);
+        });
+
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+
+        act(() => {
+            loopCallback(10);
+        });
+
+        act(() => {
+            result.current.setStep(7);
+        });
+
+        expect(result.current.currentStep).toBe(7);
+
+        act(() => {
+            scheduledCallbacks[0]();
+        });
+
+        expect(result.current.currentStep).toBe(7);
+    });
+
     it('cleans up on unmount', async () => {
         const { result, unmount } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });

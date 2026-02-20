@@ -18,6 +18,7 @@ export function useAudio() {
     const isLoadedRef = useRef(false);
     const perfTickRef = useRef(0);
     const wakeLockRef = useRef(null);
+    const playheadVersionRef = useRef(0);
 
     const loadKit = useCallback(async (kitId) => {
         const kit = KITS[kitId];
@@ -67,6 +68,9 @@ export function useAudio() {
         }
 
         if (Tone.getTransport().state === "started") {
+            // Invalidate any already queued UI updates from the previous
+            // transport timeline before stopping.
+            playheadVersionRef.current += 1;
             // Pause playback but preserve the current playhead position so resume
             // continues from the same step. `handleReset` is responsible for
             // explicitly resetting to step 0.
@@ -164,7 +168,11 @@ export function useAudio() {
             });
 
             // Schedule UI update
+            const scheduledPlayheadVersion = playheadVersionRef.current;
             Tone.getDraw().schedule(() => {
+                // Ignore stale scheduled updates after a manual seek/stop.
+                if (scheduledPlayheadVersion !== playheadVersionRef.current) return;
+
                 if (perfEnabled) {
                     performance.mark(uiMarkName);
                     performance.measure(measureName, audioMarkName, uiMarkName);
@@ -192,6 +200,8 @@ export function useAudio() {
     }, []);
 
     const setStep = useCallback((step) => {
+        // Invalidate queued draw updates from the previous timeline position.
+        playheadVersionRef.current += 1;
         stepRef.current = step;
         setCurrentStep(step);
     }, []);
