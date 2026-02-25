@@ -406,4 +406,91 @@ describe('App', () => {
          expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-auto-scroll', 'true');
          expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-zoom', '1');
     });
+
+    it('closes modals when pressing Escape', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        const shareBtn = screen.getByTitle('Share Pattern');
+        fireEvent.click(shareBtn);
+        expect(screen.getByTestId('mock-share-modal')).toBeInTheDocument();
+
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(screen.queryByTestId('mock-share-modal')).not.toBeInTheDocument();
+    });
+
+    it('closes help modal when pressing Escape', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        const helpBtn = screen.getByTitle('Help');
+        fireEvent.click(helpBtn);
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(screen.queryByTestId('mock-help')).not.toBeInTheDocument();
+    });
+
+    it('handles reset while playing', () => {
+        mockUseAudio.isLoaded = true;
+        mockUseAudio.isPlaying = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        mockUseAudio.togglePlay.mockClear();
+        const homeBtn = screen.getByTitle('Go Back to Setup');
+        fireEvent.click(homeBtn);
+
+        expect(mockUseAudio.togglePlay).toHaveBeenCalled();
+    });
+
+    it('handles invalid URL hash gracefully', () => {
+        window.location.hash = '#invalid-hash';
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+    });
+
+    it('handles URL hash with invalid grid data gracefully', () => {
+        window.location.hash = '#120|4/4|black-pearl|invalidgrid|v1';
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+    });
+
+    it('handles URL hash with invalid signature gracefully', () => {
+        const rows = INSTRUMENTS.length;
+        const steps = 16;
+        const grid = Array.from({ length: rows }, () => Array.from({ length: steps }, () => false));
+        const encoded = encodeGrid(grid);
+        window.location.hash = `#120|INVALID_SIG|black-pearl|${encoded}|v1`;
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+    });
+
+    it('handles URL hash with too few parts gracefully', () => {
+        window.location.hash = '#120|4/4';
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+    });
+
+    it('handles empty hash gracefully', () => {
+        window.location.hash = '';
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+    });
+
+    it('loads shared URL with kit selection', () => {
+        const rows = INSTRUMENTS.length;
+        const steps = 16;
+        const grid = Array.from({ length: rows }, () => Array.from({ length: steps }, () => false));
+        const encoded = encodeGrid(grid);
+        window.location.hash = `#120|4/4|custom-kit|${encoded}|v1`;
+        render(<App />);
+        expect(screen.queryByTestId('mock-setup')).not.toBeInTheDocument();
+    });
 });
