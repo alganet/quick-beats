@@ -132,4 +132,70 @@ describe('useAutoScroll', () => {
 
         expect(scrollContainerRef.current.scrollTo).not.toHaveBeenCalled();
     });
+
+    it('disables autoScroll when user manually scrolls', () => {
+        const { result } = renderHook(() => useAutoScroll({
+            scrollContainerRef,
+            currentStep: 0,
+            stepCount: 16,
+            grouping: 4,
+            autoScroll: true,
+            setAutoScroll,
+            setCanScroll,
+            zoom: 1
+        }));
+
+        result.current.handleManualScroll();
+        expect(setAutoScroll).toHaveBeenCalledWith(false);
+    });
+
+    it('does not disable autoScroll on manual scroll when already disabled', () => {
+        const { result } = renderHook(() => useAutoScroll({
+            scrollContainerRef,
+            currentStep: 0,
+            stepCount: 16,
+            grouping: 4,
+            autoScroll: false,
+            setAutoScroll,
+            setCanScroll,
+            zoom: 1
+        }));
+
+        result.current.handleManualScroll();
+        expect(setAutoScroll).not.toHaveBeenCalled();
+    });
+
+    it('sets playheadOffLeft when playhead is before viewport', () => {
+        const { rerender, result } = renderHook((props) => useAutoScroll(props), {
+            initialProps: {
+                scrollContainerRef,
+                currentStep: 0,
+                stepCount: 64,
+                grouping: 4,
+                autoScroll: false,
+                setAutoScroll,
+                setCanScroll,
+                zoom: 1
+            }
+        });
+
+        // Scroll container to position 200, which is > gridOriginOffset (48)
+        scrollContainerRef.current.scrollLeft = 200;
+        scrollContainerRef.current.clientWidth = 800;
+
+        // change currentStep to force effect to run again
+        rerender({
+            scrollContainerRef,
+            currentStep: 1,
+            stepCount: 64,
+            grouping: 4,
+            autoScroll: false,
+            setAutoScroll,
+            setCanScroll,
+            zoom: 1
+        });
+
+        // After rerender the second time, check the same hook's result
+        expect(result.current.playheadOffLeft).toBe(true);
+    });
 });

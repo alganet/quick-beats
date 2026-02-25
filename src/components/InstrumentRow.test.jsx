@@ -103,4 +103,66 @@ describe('InstrumentRow', () => {
         // Check args? Depends on implementation.
         // Usually: setMenuState({ x, y, type: 'pad', ... })
     });
+
+    it('renders left spacer when visibleRange.start is greater than 0', () => {
+        const gridRow = Array(32).fill(false);
+        render(<InstrumentRow
+            {...defaultProps}
+            gridRow={gridRow}
+            stepCount={32}
+            visibleRange={{ start: 8, end: 24 }}
+        />);
+        // Should render pads only for the visible range (8-23)
+        expect(screen.queryByTestId('pad-0')).not.toBeInTheDocument();
+        expect(screen.getByTestId('pad-8')).toBeInTheDocument();
+        expect(screen.getByTestId('pad-23')).toBeInTheDocument();
+        expect(screen.queryByTestId('pad-24')).not.toBeInTheDocument();
+    });
+
+    it('renders right spacer when visibleRange.end is less than stepCount', () => {
+        const gridRow = Array(32).fill(false);
+        render(<InstrumentRow
+            {...defaultProps}
+            gridRow={gridRow}
+            stepCount={32}
+            visibleRange={{ start: 0, end: 16 }}
+        />);
+        // Should render pads only for the visible range (0-15)
+        expect(screen.getByTestId('pad-0')).toBeInTheDocument();
+        expect(screen.getByTestId('pad-15')).toBeInTheDocument();
+        expect(screen.queryByTestId('pad-16')).not.toBeInTheDocument();
+    });
+
+    it('passes faded prop to pads when pendingDelete matches measure', () => {
+        const gridRow = Array(16).fill(false);
+        render(<InstrumentRow
+            {...defaultProps}
+            gridRow={gridRow}
+            stepCount={16}
+            stepsPerMeasure={16}
+            pendingDelete={0}
+        />);
+        expect(screen.getByTestId('pad-0')).toHaveAttribute('data-faded', 'true');
+    });
+
+    it('handles missing stepCount by using gridRow length', () => {
+        render(<InstrumentRow
+            {...defaultProps}
+            gridRow={[true, false, true]}
+            stepCount={undefined}
+        />);
+        expect(screen.getByTestId('pad-0')).toBeInTheDocument();
+        expect(screen.getByTestId('pad-2')).toBeInTheDocument();
+    });
+
+    it('handles visibleRange with start at 0 (no left spacer)', () => {
+        const gridRow = Array(16).fill(false);
+        render(<InstrumentRow
+            {...defaultProps}
+            gridRow={gridRow}
+            stepCount={16}
+            visibleRange={{ start: 0, end: 8 }}
+        />);
+        expect(screen.getByTestId('pad-0')).toBeInTheDocument();
+    });
 });
