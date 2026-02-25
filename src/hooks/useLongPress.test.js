@@ -121,4 +121,35 @@ describe('useLongPress', () => {
 
         expect(onClick).toHaveBeenCalledTimes(1);
     });
+
+    it('does not trigger long press if mouse leaves before delay', () => {
+        const onClick = vi.fn();
+        const onLongPress = vi.fn();
+        const { result } = renderHook(() => useLongPress({ onClick, onLongPress }));
+        const handlers = result.current[0];
+
+        act(() => {
+            handlers.onMouseDown({ clientX: 0, clientY: 0 });
+            handlers.onMouseLeave({ clientX: 0, clientY: 0 });
+            vi.advanceTimersByTime(500);
+        });
+
+        expect(onLongPress).not.toHaveBeenCalled();
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('ignores mouse move that is within threshold', () => {
+        const onClick = vi.fn();
+        const onLongPress = vi.fn();
+        const { result } = renderHook(() => useLongPress({ onClick, onLongPress }));
+        const handlers = result.current[0];
+
+        act(() => {
+            handlers.onMouseDown({ clientX: 0, clientY: 0 });
+            handlers.onMouseMove({ clientX: 5, clientY: 5 });
+            vi.advanceTimersByTime(500);
+        });
+
+        expect(onLongPress).toHaveBeenCalled();
+    });
 });

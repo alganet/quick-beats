@@ -17,6 +17,7 @@ describe('Pad', () => {
             cellClass: 'w-10',
             radiusClass: 'rounded-md',
             groupGapClass: 'mr-4',
+            groupGap: 8,
             cellHeight: 48,
             gap: 4
         },
@@ -103,5 +104,31 @@ describe('Pad', () => {
         render(<Pad {...defaultProps} />);
         const pad = screen.getByTestId('pad');
         expect(pad).toHaveClass('touch-pan-x');
+    });
+
+    it('applies faded styles when faded prop is true', () => {
+        render(<Pad {...defaultProps} faded={true} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveClass('opacity-30');
+        expect(pad).toHaveClass('pointer-events-none');
+    });
+
+    it('does not apply faded styles when faded prop is false', () => {
+        render(<Pad {...defaultProps} faded={false} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).not.toHaveClass('opacity-30');
+        expect(pad).not.toHaveClass('pointer-events-none');
+    });
+
+    it('applies group gap margin on last item in group', () => {
+        render(<Pad {...defaultProps} colIdx={3} grouping={4} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad.style.marginRight).toBe('8px');
+    });
+
+    it('does not apply group gap margin on non-last item in group', () => {
+        render(<Pad {...defaultProps} colIdx={2} grouping={4} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad.style.marginRight).toBe('');
     });
 });

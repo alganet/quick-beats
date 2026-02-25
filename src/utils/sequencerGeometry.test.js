@@ -56,4 +56,29 @@ describe('sequencerGeometry', () => {
 
         Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: originalWidth });
     });
+
+    it('handles undefined or zero grouping values', () => {
+        expect(stepToX(4, undefined, 1)).toBe(stepToX(4, 1, 1));
+        expect(stepToX(4, 0, 1)).toBe(stepToX(4, 1, 1));
+        expect(measureWidth(4, undefined, 1)).toBe(measureWidth(4, 1, 1));
+        expect(measureWidth(4, 0, 1)).toBe(measureWidth(4, 1, 1));
+    });
+
+    it('handles negative step values', () => {
+        expect(stepToX(-5, 4, 1)).toBe(0);
+    });
+
+    it('handles undefined or zero stepCount in xToStep', () => {
+        expect(xToStep(100, undefined, 4, 1)).toBe(0);
+        expect(xToStep(100, 0, 4, 1)).toBe(0);
+    });
+
+    it('handles measureWidth with steps smaller than grouping', () => {
+        expect(measureWidth(2, 4, 1)).toBeGreaterThan(0);
+        expect(measureWidth(4, 4, 1)).toBeGreaterThan(0);
+    });
+
+    it('falls back to default zoom config for unknown zoom levels', () => {
+        expect(stepToX(4, 4, 999)).toBe(stepToX(4, 4, 1));
+    });
 });

@@ -6,6 +6,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Sequencer from './Sequencer';
 import { INSTRUMENTS } from '../data/kit';
+// import the hook here so we can access the mocked function later
+import { useAutoScroll } from '../hooks/useAutoScroll';
+
+// alias the imported function for clarity in tests
+const mockUseAutoScroll = useAutoScroll;
 
 // Mocks
 vi.mock('./SequencerHeader', () => ({
@@ -41,12 +46,9 @@ vi.mock('./ContextMenu', () => ({
     default: ({ isOpen }) => isOpen ? <div data-testid="mock-context-menu">Menu</div> : null
 }));
 
+// mock the hook; we'll grab the mocked function via import below
 vi.mock('../hooks/useAutoScroll', () => ({
-    useAutoScroll: () => ({
-        playheadOffRight: false,
-        playheadOffLeft: false,
-        handleManualScroll: vi.fn()
-    })
+    useAutoScroll: vi.fn()
 }));
 
 vi.mock('../hooks/useSequencerSelection', () => ({
@@ -98,6 +100,12 @@ describe('Sequencer', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // make sure useAutoScroll always returns a valid object by default
+        mockUseAutoScroll.mockReturnValue({
+            playheadOffRight: false,
+            playheadOffLeft: false,
+            handleManualScroll: vi.fn()
+        });
     });
 
     it('renders all instrument rows', () => {
@@ -149,6 +157,49 @@ describe('Sequencer', () => {
         // We can check if it calls removeMeasure if we confirm?
         // But MeasureControls handles the confirm internal logic (tested separately).
         // This test confirms the wiring exists.
+    });
+
+    it('calls addMeasure when add measure button is clicked', () => {
+        render(<Sequencer {...defaultProps} />);
+        const addButton = screen.getByTitle('Add Measure');
+        fireEvent.click(addButton);
+        expect(defaultProps.addMeasure).toHaveBeenCalled();
+    });
+
+    it('shows playhead off right indicator when playheadOffRight is true and autoScroll is false', () => {
+        // start with default autoScroll=false
+        const { rerender, container } = render(<Sequencer {...defaultProps} autoScroll={false} />);
+
+        // override the mock return value for this scenario
+        mockUseAutoScroll.mockReturnValue({
+            playheadOffRight: true,
+            playheadOffLeft: false,
+            handleManualScroll: vi.fn()
+        });
+
+        // rerender to pick up new hook return value
+        rerender(<Sequencer {...defaultProps} autoScroll={false} />);
+
+        // the arrow-right icon should now be present in the DOM
+        const offRightIcon = container.querySelector('use[href="#icon-arrow-right"]');
+        expect(offRightIcon).toBeInTheDocument();
+    });
+
+    it('handles wheel event for manual scroll', () => {
+        // prepare a spy for handleManualScroll
+        const manualScrollSpy = vi.fn();
+        mockUseAutoScroll.mockReturnValue({
+            playheadOffRight: false,
+            playheadOffLeft: false,
+            handleManualScroll: manualScrollSpy
+        });
+
+        render(<Sequencer {...defaultProps} />);
+        const scrollContainer = document.querySelector('[data-sequencer-scroll-container="true"]');
+        expect(scrollContainer).not.toBeNull();
+
+        fireEvent.wheel(scrollContainer);
+        expect(manualScrollSpy).toHaveBeenCalled();
     });
 });
 
