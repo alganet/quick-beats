@@ -57,6 +57,17 @@ describe('hashState', () => {
             expect(decodeGrid('invalid.abc', 2)).toBeNull();
         });
 
+        it('should return null for corrupt base64 data and log error', () => {
+            // Valid format but corrupt base64 that throws in atob
+            // Use a properly formatted string but with invalid base64 content
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            
+            expect(decodeGrid('4.!!!invalidbase64', 2)).toBeNull();
+            
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
         it('should decode a valid encoded grid', () => {
             const grid = [
                 [true, false, false, false],
@@ -169,5 +180,45 @@ describe('hashState', () => {
             expect(parsed.kitId).toBe('black-pearl');
             expect(parsed.grid).toEqual(grid);
         });
+
+        it('parses 4-part format (bpm|sig|kit|grid)', () => {
+            const rows = 2;
+            const grid = [
+                [true, false, false, false, true, false, false, false],
+                [false, true, false, false, false, true, false, false],
+            ];
+            const encodedGrid = encodeGrid(grid);
+            // 4 parts: bpm, sigName, kitId, grid
+            const hash = `130|5/4|custom-kit|${encodedGrid}`;
+
+            const parsed = parseShareHash(hash, rows);
+            expect(parsed).not.toBeNull();
+            expect(parsed.bpm).toBe(130);
+            expect(parsed.sigName).toBe('5/4');
+            expect(parsed.kitId).toBe('custom-kit');
+            expect(parsed.grid).toEqual(grid);
+        });
+
+        it('returns null for invalid bpm', () => {
+            const hash = 'abc|4/4|4.abc';
+            expect(parseShareHash(hash, 2)).toBeNull();
+        });
+
+        it('returns null for hash with fewer than 3 parts', () => {
+            expect(parseShareHash('120', 2)).toBeNull();
+            expect(parseShareHash('120|4/4', 2)).toBeNull();
+        });
+
+        it('parses 4-part format with version (bpm|sig|grid|v1)', () => {
+            const rows = 2;
+            const grid = [[true, false], [false, true]];
+            const encodedGrid = encodeGrid(grid);
+            const hash = `120|4/4|${encodedGrid}|v1`;
+            
+            const parsed = parseShareHash(hash, rows);
+            expect(parsed).not.toBeNull();
+            expect(parsed.kitId).toBe('black-pearl'); // default kit
+            expect(parsed.grid).toEqual(grid);
+            });
     });
 });

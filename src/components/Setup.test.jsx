@@ -90,7 +90,7 @@ describe('Setup', () => {
         const onShowHelp = vi.fn();
         renderWithSprite(<Setup {...defaultProps} onShowHelp={onShowHelp} />);
 
-        const versionButton = screen.getByText('v1.2.5');
+        const versionButton = screen.getByText('v1.2.6');
         fireEvent.click(versionButton);
 
         expect(onShowHelp).toHaveBeenCalledTimes(1);

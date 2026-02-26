@@ -10,7 +10,6 @@ import {
     calculateNewMeasure, 
     calculateGridWithRemovedMeasure 
 } from './gridHelpers';
-import { BACKBEATS } from '../data/patterns';
 
 describe('gridHelpers', () => {
 
@@ -21,7 +20,7 @@ describe('gridHelpers', () => {
              // Note: BACKBEATS is imported in implementation. We assume it contains standard data.
              // If BACKBEATS['4/4'].rhythm['Kick'] has [0, 8, 10], we check that.
              
-             // Since we rely on the actual data file, we can just check structure or known specific.
+             // Since we rely on the actual data file, we can just check dimensions or known specific.
              // Let's settle for checking dimensions.
              const instruments = ['Kick', 'Snare'];
              const grid = generateGridFromSig(sig, instruments);
@@ -93,6 +92,18 @@ describe('gridHelpers', () => {
             expect(newGrid[0][8]).toBe(true);
             expect(newGrid[0][12]).toBe(false);
         });
+
+        it('should return unchanged grid when timeSignature is missing', () => {
+            const grid = [[true, false, true, false]];
+            const newGrid = calculateBulkUpdate(grid, 0, 0, 'repeat', undefined);
+            expect(newGrid).toBe(grid);
+        });
+
+        it('should return unchanged grid when timeSignature is null', () => {
+            const grid = [[true, false, true, false]];
+            const newGrid = calculateBulkUpdate(grid, 0, 0, 'repeat', null);
+            expect(newGrid).toBe(grid);
+        });
     });
 
     describe('calculateNewMeasure', () => {
@@ -120,6 +131,18 @@ describe('gridHelpers', () => {
             expect(newMeas[0]).toBe(true);
             expect(newMeas[8]).toBe(true);
             expect(newMeas[1]).toBe(false);
+        });
+
+        it('should default unclaimed steps to false', () => {
+            // Sparse pattern that won't trigger confidence threshold
+            const row = Array(16).fill(false);
+            row[0] = true; // Only one step - won't meet 70% threshold for any period
+            const grid = [row];
+            
+            const newGrid = calculateNewMeasure(grid, sig);
+            const newMeas = newGrid[0].slice(16, 32);
+            // All new steps should be false (unclaimed default)
+            expect(newMeas.every(v => v === false)).toBe(true);
         });
     });
 

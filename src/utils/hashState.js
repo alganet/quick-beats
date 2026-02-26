@@ -96,14 +96,26 @@ export const parseShareHash = (hash, expectedRows) => {
 
     // two supported shapes:
     //  - bpm|sig|cols.base64       (legacy/short)
-    //  - bpm|sig|kit|cols.base64|v1 (full)
+    //  - bpm|sig|cols.base64|v1    (legacy with version)
+    //  - bpm|sig|kit|cols.base64   (4-part with kit)
+    //  - bpm|sig|kit|cols.base64|v1 (full with version)
     if (parts.length === 3) {
         gridData = parts[2];
     } else if (parts.length >= 4) {
         // When a kit is provided the grid is the next segment. Ignore trailing
         // version segment if present.
         if (parts.length === 4) {
-            gridData = parts[2];
+            // Could be bpm|sig|kit|grid or bpm|sig|grid|v1
+            // If parts[2] looks like grid data (contains a dot, number.base64),
+            // treat as grid format; otherwise treat as kit format.
+            if (parts[2].includes('.')) {
+                // bpm|sig|grid|v1 (legacy with version)
+                gridData = parts[2];
+            } else {
+                // bpm|sig|kit|grid (4-part with kit)
+                kitId = parts[2];
+                gridData = parts[3];
+            }
         } else {
             kitId = parts[2];
             gridData = parts[3];
