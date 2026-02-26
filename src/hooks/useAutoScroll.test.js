@@ -198,4 +198,56 @@ describe('useAutoScroll', () => {
         // After rerender the second time, check the same hook's result
         expect(result.current.playheadOffLeft).toBe(true);
     });
+
+    it('returns default values when container ref is null on mount', () => {
+        const nullRef = { current: null };
+        // Should not throw, just return defaults
+        const { result } = renderHook(() => useAutoScroll({
+            scrollContainerRef: nullRef,
+            currentStep: 0,
+            stepCount: 16,
+            grouping: 4,
+            autoScroll: true,
+            setAutoScroll,
+            setCanScroll,
+            zoom: 1
+        }));
+
+        expect(result.current.playheadOffRight).toBe(false);
+        expect(result.current.playheadOffLeft).toBe(false);
+    });
+
+    it('scrolls to left edge when playhead is off left and autoScroll is enabled', () => {
+        const { rerender } = renderHook((props) => useAutoScroll(props), {
+            initialProps: {
+                scrollContainerRef,
+                currentStep: 0,
+                stepCount: 64,
+                grouping: 4,
+                autoScroll: true,
+                setAutoScroll,
+                setCanScroll,
+                zoom: 1
+            }
+        });
+
+        // Scroll to position far right
+        scrollContainerRef.current.scrollLeft = 500;
+        scrollContainerRef.current.clientWidth = 800;
+
+        // Move to early step (off left)
+        rerender({
+            scrollContainerRef,
+            currentStep: 1,
+            stepCount: 64,
+            grouping: 4,
+            autoScroll: true,
+            setAutoScroll,
+            setCanScroll,
+            zoom: 1
+        });
+
+        // Should scroll to left edge (0)
+        expect(scrollContainerRef.current.scrollTo).toHaveBeenCalledWith({ left: 0, behavior: 'auto' });
+    });
 });

@@ -301,4 +301,33 @@ describe('useAudio', () => {
 
         expect(mockPlayersInstance.dispose).toHaveBeenCalled();
     });
+
+    it('handles audio playback errors gracefully', async () => {
+        const { result } = renderHook(() => useAudio());
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+
+        // Make player.start throw an error
+        mockPlayersInstance.player.mockReturnValue({
+            start: vi.fn().mockImplementation(() => { throw new Error('Audio error'); }),
+            stop: vi.fn()
+        });
+
+        const grid = [[true, false]];
+        act(() => {
+            result.current.updateGrid(grid);
+        });
+
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+
+        // Spy on console.warn to verify error is handled
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        
+        // Should not throw - error is caught internally
+        act(() => {
+            loopCallback(10);
+        });
+
+        expect(warnSpy).toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
 });

@@ -134,4 +134,73 @@ describe('useSequencerSelection', () => {
         expect(onBulkUpdate).toHaveBeenCalledWith(1, 2, 'repeat');
         expect(result.current.menuState.isOpen).toBe(false);
     });
+
+    it('handles touch move selection', () => {
+        const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate: vi.fn() }));
+
+        const mockMenu = document.createElement('div');
+        vi.spyOn(mockMenu, 'getBoundingClientRect').mockReturnValue({
+            top: 100,
+            height: 150,
+            left: 0, width: 100, bottom: 250, right: 100, x: 0, y: 100, toJSON: () => {}
+        });
+        result.current.menuRef.current = mockMenu;
+
+        act(() => {
+            result.current.setMenuState({
+                isOpen: true,
+                x: 0, y: 0, row: 0, col: 0, activeOption: null
+            });
+        });
+
+        const touchMoveEvent = new TouchEvent('touchmove', {
+            bubbles: true,
+            cancelable: true,
+            touches: [{ clientY: 175 }] // middle item -> alternate
+        });
+
+        act(() => {
+            window.dispatchEvent(touchMoveEvent);
+        });
+
+        expect(result.current.menuState.activeOption).toBe('alternate');
+    });
+
+    it('calls onBulkUpdate and closes on touchend', () => {
+        const onBulkUpdate = vi.fn();
+        const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate }));
+
+        act(() => {
+            result.current.setMenuState({
+                isOpen: true,
+                x: 0, y: 0, row: 2, col: 3, activeOption: 'clear'
+            });
+        });
+
+        const touchEndEvent = new TouchEvent('touchend', { bubbles: true });
+        act(() => {
+            window.dispatchEvent(touchEndEvent);
+        });
+
+        expect(onBulkUpdate).toHaveBeenCalledWith(2, 3, 'clear');
+        expect(result.current.menuState.isOpen).toBe(false);
+    });
+
+    it('closes menu on touchcancel', () => {
+        const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate: vi.fn() }));
+
+        act(() => {
+            result.current.setMenuState({
+                isOpen: true,
+                x: 0, y: 0, row: 0, col: 0, activeOption: 'repeat'
+            });
+        });
+
+        const touchCancelEvent = new TouchEvent('touchcancel', { bubbles: true });
+        act(() => {
+            window.dispatchEvent(touchCancelEvent);
+        });
+
+        expect(result.current.menuState.isOpen).toBe(false);
+    });
 });
