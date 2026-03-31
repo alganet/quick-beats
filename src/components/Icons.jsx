@@ -7,12 +7,12 @@
 export const IconSprite = () => (
     <svg xmlns="http://www.w3.org/2000/svg" style={{ display: 'none' }}>
         <symbol id="icon-logo" viewBox="0 0 64 64">
-            <circle cx="32" cy="32" r="30" fill="#141414" />
-            <circle cx="32" cy="32" r="30" stroke="#22d3ee" strokeWidth="2.5" />
-            <rect x="17" y="17" width="12" height="12" rx="2.5" fill="#444" />
-            <rect x="35" y="17" width="12" height="12" rx="2.5" fill="#22d3ee" />
-            <rect x="17" y="35" width="12" height="12" rx="2.5" fill="#3b82f6" />
-            <rect x="35" y="35" width="12" height="12" rx="2.5" fill="#444" />
+            <circle cx="32" cy="32" r="30" fill="#141414"/>
+            <circle cx="32" cy="32" r="30" stroke="#22d3ee" strokeWidth="2.5"/>
+            <rect x="17" y="17" width="12" height="12" rx="2.5" fill="#444"/>
+            <rect x="35" y="17" width="12" height="12" rx="2.5" fill="#22d3ee"/>
+            <rect x="17" y="35" width="12" height="12" rx="2.5" fill="#3b82f6"/>
+            <rect x="35" y="35" width="12" height="12" rx="2.5" fill="#444"/>
         </symbol>
         <symbol id="icon-play" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" fill="currentColor" />
@@ -102,6 +102,16 @@ export const IconSprite = () => (
         </symbol>
         <symbol id="icon-telegram" viewBox="0 0 24 24">
             <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.698.064-1.226-.461-1.901-.903-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.303.48-.429-.012-1.253-.245-1.867-.444-.754-.245-1.354-.375-1.303-.791.026-.217.325-.44.896-.669 3.51-1.53 5.85-2.54 7.02-3.03 3.34-1.393 4.034-1.635 4.488-1.643z" fill="currentColor" />
+        </symbol>
+        <symbol id="icon-sun" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" fill="none" />
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </symbol>
+        <symbol id="icon-moon" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </symbol>
+        <symbol id="icon-menu" viewBox="0 0 24 24">
+            <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </symbol>
     </svg>
 );

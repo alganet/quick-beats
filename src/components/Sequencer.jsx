@@ -140,7 +140,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, toggleStep, bul
     };
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden relative select-none bg-[#111]">
+        <div className="flex-1 flex flex-col overflow-hidden relative select-none bg-surface-1">
             {menuState.isOpen && (
                 <ContextMenu
                     ref={menuRef}
@@ -154,14 +154,14 @@ export default function Sequencer({ isPlaying, togglePlay, grid, toggleStep, bul
             {/* Playhead off-screen indicators - Fixed at top corners */}
             {playheadOffRight && !autoScroll && (
                 <div className="absolute right-0 top-0 h-6 md:h-8 flex items-center pr-0 z-50 pointer-events-none">
-                    <div className={`text-[#22d3ee] transition-opacity ${isPlaying ? 'animate-pulse-subtle' : ''}`}>
+                    <div className={`text-accent transition-opacity ${isPlaying ? 'animate-pulse-subtle' : ''}`}>
                         <Icon id="arrow-right" className="w-10 h-10" />
                     </div>
                 </div>
             )}
             {playheadOffLeft && !autoScroll && (
                 <div className="absolute left-0 md:left-0 top-0 h-6 md:h-8 flex items-center pl-0 z-50 pointer-events-none">
-                    <div className={`text-[#22d3ee] transition-opacity ${isPlaying ? 'animate-pulse-subtle' : ''}`}>
+                    <div className={`text-accent transition-opacity ${isPlaying ? 'animate-pulse-subtle' : ''}`}>
                         <Icon id="arrow-left" className="w-10 h-10" />
                     </div>
                 </div>
@@ -225,7 +225,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, toggleStep, bul
                             <button
                                 onClick={() => addMeasure()}
                                 style={{ width: ZOOM_CONFIG[zoom].cellHeight }}
-                                className="flex-none w-12 self-stretch flex items-center justify-center cursor-pointer bg-[#000] hover:bg-[#1e1e1e] text-slate-600 hover:text-[#3b82f6] transition-all border border-[#222] border-r-0 mt-1 mb-4 group/add-btn"
+                                className="flex-none w-12 self-stretch flex items-center justify-center cursor-pointer bg-surface-6 hover:bg-surface-4 text-fg-dim hover:text-primary transition-all border border-surface-5 border-r-0 mt-1 mb-4 group/add-btn"
                                 title="Add Measure"
                             >
                                 <span className="text-xl font-light transition-transform">+</span>

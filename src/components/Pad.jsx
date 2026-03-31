@@ -32,8 +32,8 @@ export const Pad = ({ isActive, rowIdx, colIdx, grouping, config, toggleStep, se
             {...longPressHandlers}
             className={`flex-none cursor-pointer touch-pan-x relative ${config.radiusClass}
                 ${isActive
-                    ? "bg-[#3b82f6]"
-                    : "bg-[#222] hover:bg-[#444]"}
+                    ? "bg-primary"
+                    : "bg-surface-5 hover:bg-border-medium"}
                 ${faded ? 'opacity-30 pointer-events-none' : ''}
             `}
             style={{

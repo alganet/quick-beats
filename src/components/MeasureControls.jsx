@@ -71,10 +71,10 @@ export function MeasureControls({
                     return (
                         <div
                             key={measureIdx}
-                            className={`group flex-none flex cursor-pointer transition-left border border-[#222] relative
+                            className={`group flex-none flex cursor-pointer transition-left border border-surface-5 relative
                                 ${isPending
                                     ? 'bg-red-500/10 z-50 overflow-visible'
-                                    : 'bg-[#000] hover:bg-[#1e1e1e] text-[#733] hover:text-red-500'
+                                    : 'bg-surface-6 hover:bg-surface-4 text-danger-dim hover:text-red-500'
                                 }
                             `}
                             style={{

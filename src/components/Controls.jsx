@@ -55,8 +55,8 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm, autoScrol
                 <button
                     onClick={togglePlay}
                     className={`w-10 h-10 flex-shrink-0 flex items-center justify-center transition-all rounded-sm ${isPlaying
-                        ? "bg-[#ff3e3e] text-white"
-                        : "bg-[#22c55e] text-white"
+                        ? "bg-danger text-fg"
+                        : "bg-success text-fg"
                         }`}
                     title={isPlaying ? "Stop [Space]" : "Play [Space]"}
                     aria-label={isPlaying ? "Stop" : "Play"}
@@ -64,15 +64,15 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm, autoScrol
                     <Icon id={isPlaying ? "stop" : "play"} className="w-5 h-5" />
                 </button>
 
-                <div className="flex items-center gap-1 bg-[#222] rounded-sm mr-1">
-                    
-                    <div className="text-slate-500 flex flex-col select-none inline-block leading-1 border-r-2 border-[#111] px-1 h-8">
+                <div className="flex items-center gap-1 bg-surface-5 rounded-sm mr-1">
+
+                    <div className="text-fg-muted flex flex-col select-none inline-block leading-1 border-r-2 border-surface-1 px-1 h-8">
                         <div className="text-[10px] font-bold font-mono uppercase m-2 text-center">{bpm}</div>
                         <div className="text-[10px] font-mono m-2">BPM</div>
                     </div>
                     <button
                         title="Decrease BPM [-]"
-                        className="hover:text-white text-slate-500 text-sm min-w-6 w-6 h-6 pl-1 text-center"
+                        className="hover:text-fg text-fg-muted text-sm min-w-6 w-6 h-6 pl-1 text-center"
                         onClick={() => setBpm(clampBpm(bpm - 1))}
                     >−</button>
                     <div className="tempo-input-wrapper h-8 w-auto">
@@ -87,7 +87,7 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm, autoScrol
                     </div>
                     <button
                         title="Increase BPM [+]"
-                        className="hover:text-white text-slate-500 text-sm min-w-6 w-6 h-6 pr-1 text-center"
+                        className="hover:text-fg text-fg-muted text-sm min-w-6 w-6 h-6 pr-1 text-center"
                         onClick={() => setBpm(clampBpm(bpm + 1))}
                     >＋</button>
                 </div>
@@ -99,7 +99,7 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm, autoScrol
                 {/* Zoom Toggle */}
                 <button
                     onClick={scheduleZoomToggle}
-                    className="flex-none w-8 h-8 flex items-center rounded-sm justify-center transition-all bg-[#222] text-slate-400 hover:text-white"
+                    className="flex-none w-8 h-8 flex items-center rounded-sm justify-center transition-all bg-surface-5 text-fg-secondary hover:text-fg"
                     title={`Change Zoom Level [z]`}
                     aria-label="Toggle Zoom"
                 >
@@ -110,8 +110,8 @@ export default function Controls({ isPlaying, togglePlay, bpm, setBpm, autoScrol
                     <button
                         onClick={scheduleAutoScrollToggle}
                         className={`flex-none w-8 h-8 flex items-center rounded-sm justify-center transition-all ${autoScroll
-                            ? "bg-white text-[#0a0a0a] shadow-[0_0_12px_rgba(255,255,255,0.3)]"
-                            : "bg-[#222] text-slate-500 hover:text-slate-300"
+                            ? "bg-surface-inverted text-fg-on-inverted shadow-[0_0_12px_color-mix(in_srgb,var(--color-highlight)_30%,transparent)]"
+                            : "bg-surface-5 text-fg-muted hover:text-fg-secondary"
                             }`}
                         title={autoScroll ? "Auto-scroll ON [s]" : "Auto-scroll OFF [s]"}
                         aria-label="Toggle auto-scroll"

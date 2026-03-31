@@ -40,8 +40,8 @@ describe('SequencerHeader', () => {
         const { container } = render(<SequencerHeader {...defaultProps} />);
         const { steps } = getHeaderAndSteps(container);
         // Step 4 should be highlighted
-        expect(steps[4]).toHaveClass('text-[#22d3ee]');
-        expect(steps[3]).toHaveClass('text-slate-600');
+        expect(steps[4]).toHaveClass('text-accent');
+        expect(steps[3]).toHaveClass('text-fg-dim');
     });
 
     it('displays measure numbers correctly', () => {

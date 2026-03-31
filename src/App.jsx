@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTheme } from './hooks/useTheme'
 import { useAudio } from './hooks/useAudio'
 import Sequencer from './components/Sequencer'
 import Controls from './components/Controls'
@@ -26,6 +27,7 @@ const ACTION_DELAY_MS = 200;
 const HASH_SYNC_DELAY_MS = 180;
 
 function App() {
+  const [theme, , toggleTheme] = useTheme();
   const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote } = useAudio();
   const lastHashRef = useRef(typeof window !== 'undefined' && window.location.hash ? window.location.hash.substring(1) : '');
   const bpmApplyTimeoutRef = useRef(null);
@@ -44,6 +46,8 @@ function App() {
   const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   const [timeSignature, setTimeSignature] = useState(_initialHash?.sig ?? null);
   const [previewSig, setPreviewSig] = useState(_initialHash?.sig ?? null);
   const [bpmInput, setBpmInput] = useState(_initialHash?.bpm ?? 120);
@@ -57,6 +61,18 @@ function App() {
     const saved = localStorage.getItem('qb-zoom');
     return saved !== null ? parseInt(saved, 10) : 1;
   });
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
 
   // Persist UI preferences
   useEffect(() => {
@@ -295,38 +311,87 @@ function App() {
   }
 
   return (
-    <div className="bg-[#111] h-screen flex flex-col text-white overflow-hidden w-fit max-w-screen min-w-[360px]">
+    <div className="bg-surface-1 h-screen flex flex-col text-fg overflow-hidden w-fit max-w-screen min-w-[360px]">
       <IconSprite />
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex-none flex items-center justify-between px-2 py-1 md:px-6 md:py-3">
           <div className="flex items-center gap-4">
-            <h1 className="text-md md:text-xl font-black tracking-tighter text-white uppercase flex items-center gap-2 select-none">
-              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 text-[#3b82f6] md:mt-0.5" />
+            <h1 className="text-md md:text-xl font-black tracking-tighter text-fg uppercase flex items-center gap-2 select-none">
+              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 text-primary md:mt-0.5" />
               Quick Beats
             </h1>
           </div>
-          <div className="flex items-center gap-1 md:gap-2">
+
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="text-[10px] font-mono text-fg-muted hover:text-fg transition-colors border border-border-default px-2 py-1 uppercase tracking-tighter"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              <Icon id={theme === 'dark' ? 'sun' : 'moon'} className="w-3 h-3 inline align-text-bottom" />
+            </button>
             <button
               onClick={() => setIsShareOpen(true)}
-              className="text-[10px] font-bold font-mono text-slate-500 hover:text-white transition-colors border border-[#333] px-2 py-1 uppercase tracking-tighter"
+              className="text-[10px] font-bold font-mono text-fg-muted hover:text-fg transition-colors border border-border-default px-2 py-1 uppercase tracking-tighter"
               title="Share Pattern"
             >
-              <Icon id="share" className="w-3.5 h-3.5 md:w-3 md:h-3 inline align-text-bottom" /> Share Beat
+              <Icon id="share" className="w-3 h-3 inline align-text-bottom" /> Share Beat
             </button>
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="text-[10px] font-bold font-mono text-slate-500 hover:text-white transition-colors border border-[#333] px-2 py-1 uppercase tracking-tighter"
+              className="text-[10px] font-bold font-mono text-fg-muted hover:text-fg transition-colors border border-border-default px-2 py-1 uppercase tracking-tighter"
               title="Help"
             >
-              <Icon id="help" className="w-3.5 h-3.5 md:w-3 md:h-3 inline align-text-bottom" /> Help
+              <Icon id="help" className="w-3 h-3 inline align-text-bottom" /> Help
             </button>
             <button
               onClick={handleReset}
-              className="text-[10px] font-mono text-slate-500 hover:text-white transition-colors border border-[#333] px-2 py-1 uppercase tracking-tighter"
+              className="text-[10px] font-mono text-fg-muted hover:text-fg transition-colors border border-border-default px-2 py-1 uppercase tracking-tighter"
               title="Go Back to Setup"
             >
               Home
             </button>
+          </div>
+
+          {/* Mobile hamburger */}
+          <div className="relative md:hidden" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              className="text-fg-muted hover:text-fg transition-colors border border-border-default p-1.5"
+              title="Menu"
+            >
+              <Icon id="menu" className="w-4 h-4" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-[90] bg-surface-2 border border-border-default shadow-2xl min-w-[160px]">
+                <button
+                  onClick={() => { toggleTheme(); setMenuOpen(false); }}
+                  className="w-full text-left text-[10px] font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors"
+                >
+                  <Icon id={theme === 'dark' ? 'sun' : 'moon'} className="w-3.5 h-3.5" />
+                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                </button>
+                <button
+                  onClick={() => { setIsShareOpen(true); setMenuOpen(false); }}
+                  className="w-full text-left text-[10px] font-bold font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors"
+                >
+                  <Icon id="share" className="w-3.5 h-3.5" /> Share Beat
+                </button>
+                <button
+                  onClick={() => { setIsHelpOpen(true); setMenuOpen(false); }}
+                  className="w-full text-left text-[10px] font-bold font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors"
+                >
+                  <Icon id="help" className="w-3.5 h-3.5" /> Help
+                </button>
+                <button
+                  onClick={() => { handleReset(); setMenuOpen(false); }}
+                  className="w-full text-left text-[10px] font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors border-t border-border-dim"
+                >
+                  Home
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -342,7 +407,7 @@ function App() {
           shareUrl={window.location.href}
         />
 
-        <div className="px-4 pt-2 md:px-6 bg-[#000] border border-[#1e1e1e]">
+        <div className="px-4 pt-2 md:px-6 bg-surface-6 border border-border-dim">
           <Controls
             isPlaying={isPlaying}
             togglePlay={togglePlay}
