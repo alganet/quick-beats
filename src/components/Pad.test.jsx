@@ -38,14 +38,14 @@ describe('Pad', () => {
     it('renders inactive state correctly', () => {
         render(<Pad {...defaultProps} />);
         const pad = screen.getByTestId('pad');
-        expect(pad).toHaveClass('bg-[#222]');
-        expect(pad).not.toHaveClass('bg-[#3b82f6]');
+        expect(pad).toHaveClass('bg-surface-5');
+        expect(pad).not.toHaveClass('bg-primary');
     });
 
     it('renders active state correctly', () => {
         render(<Pad {...defaultProps} isActive={true} />);
         const pad = screen.getByTestId('pad');
-        expect(pad).toHaveClass('bg-[#3b82f6]');
+        expect(pad).toHaveClass('bg-primary');
     });
 
     it('calls toggleStep on click', () => {

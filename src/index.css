@@ -6,40 +6,87 @@
 
 @import "tailwindcss";
 
-:root {
-  --bg-dark: #0f172a;
-  --bg-panel: #1e293b;
-  --primary: #fda4af;
-  /* Soft Pink / Neon Red-ish */
-  --accent: #22d3ee;
-  /* Cyan */
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --border: #334155;
-  --grid-cell: #334155;
-  --grid-active: #f43f5e;
-  --playhead: #fbbf24;
+@theme {
+  --color-surface-0: #0a0a0a;
+  --color-surface-1: #111111;
+  --color-surface-2: #141414;
+  --color-surface-3: #1a1a1a;
+  --color-surface-4: #1e1e1e;
+  --color-surface-5: #222222;
+  --color-surface-6: #000000;
+  --color-surface-inverted: #ffffff;
+  --color-surface-inverted-hover: #e2e8f0;
+  --color-surface-inverted-active: #cbd5e1;
+
+  --color-border-dim: #1e1e1e;
+  --color-border-default: #333333;
+  --color-border-medium: #444444;
+  --color-border-bright: #555555;
+
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-light: #60a5fa;
+  --color-accent: #22d3ee;
+  --color-danger: #ff3e3e;
+  --color-danger-dim: #773333;
+  --color-success: #22c55e;
+
+  --color-fg: #f8fafc;
+  --color-fg-secondary: #94a3b8;
+  --color-fg-muted: #64748b;
+  --color-fg-dim: #475569;
+  --color-fg-faint: #334155;
+  --color-fg-on-inverted: #000000;
+
+  --color-highlight: #ffffff;
+  --color-overlay: #000000;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --color-surface-0: #ffffff;
+  --color-surface-1: #f8fafc;
+  --color-surface-2: #f1f5f9;
+  --color-surface-3: #e2e8f0;
+  --color-surface-4: #cbd5e1;
+  --color-surface-5: #e2e8f0;
+  --color-surface-6: #f8fafc;
+  --color-surface-inverted: #0f172a;
+  --color-surface-inverted-hover: #1e293b;
+  --color-surface-inverted-active: #334155;
+
+  --color-border-dim: #e2e8f0;
+  --color-border-default: #cbd5e1;
+  --color-border-medium: #94a3b8;
+  --color-border-bright: #64748b;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #3b82f6;
+  --color-accent: #0891b2;
+  --color-danger: #dc2626;
+  --color-danger-dim: #fecaca;
+  --color-success: #16a34a;
+
+  --color-fg: #0f172a;
+  --color-fg-secondary: #475569;
+  --color-fg-muted: #64748b;
+  --color-fg-dim: #94a3b8;
+  --color-fg-faint: #cbd5e1;
+  --color-fg-on-inverted: #f8fafc;
+
+  --color-highlight: #000000;
+  --color-overlay: #000000;
 }
 
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  --bg-dark: #0a0a0a;
-  --bg-panel: #141414;
-  --bg-element: #1e1e1e;
-  --border-dim: #333333;
-  --border-medium: #444444;
-
-  --rgb-red: #ff3e3e;
-  --rgb-green: #22c55e;
-  --rgb-blue: #3b82f6;
-  --rgb-white: #f8fafc;
-  --text-muted: #64748b;
 }
 
 @layer base {
   body {
-    @apply bg-[var(--bg-dark)] text-slate-100 antialiased;
+    @apply bg-surface-0 text-fg antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
@@ -59,7 +106,7 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-[#333] rounded-full hover:bg-[#444] transition-colors;
+  @apply bg-border-default rounded-full hover:bg-border-medium transition-colors;
 }
 
 /* Custom Range Input (Slider) */
@@ -73,7 +120,7 @@ input[type="range"].tempo-input {
 
 /* Track: webkit */
 input[type="range"].tempo-input::-webkit-slider-runnable-track {
-  background: var(--color-slate-500);
+  background: var(--color-fg-muted);
   height: 4px;
   border-radius: 2px;
 }
@@ -98,7 +145,7 @@ input[type="range"].tempo-input::-webkit-slider-runnable-track {
 
 /* Track: moz */
 input[type="range"].tempo-input::-moz-range-track {
-  background: var(--color-slate-500);
+  background: var(--color-fg-muted);
   height: 4px;
   border-radius: 2px;
 }
@@ -109,34 +156,34 @@ input[type="range"].tempo-input::-webkit-slider-thumb {
   appearance: none;
   margin-top: -6px;
   /* Centers thumb on the track */
-  background-color: #3b82f6;
+  background-color: var(--color-primary);
   height: 16px;
   width: 16px;
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 40%, transparent);
   transition: all 0.2s ease;
-  border: 2px solid #0a0a0a;
+  border: 2px solid var(--color-surface-0);
 }
 
 /* Thumb: moz */
 input[type="range"].tempo-input::-moz-range-thumb {
-  background-color: #3b82f6;
+  background-color: var(--color-primary);
   height: 16px;
   width: 16px;
   border-radius: 50%;
-  border: 2px solid #0a0a0a;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  border: 2px solid var(--color-surface-0);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 40%, transparent);
   transition: all 0.2s ease;
 }
 
 /* Hover/Active states */
 input[type="range"].tempo-input:hover::-webkit-slider-thumb {
-  background-color: #60a5fa;
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+  background-color: var(--color-primary-light);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-primary) 60%, transparent);
   transform: scale(1.1);
 }
 
 input[type="range"].tempo-input:active::-webkit-slider-thumb {
-  background-color: #2563eb;
+  background-color: var(--color-primary-hover);
   transform: scale(0.95);
 }

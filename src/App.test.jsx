@@ -484,6 +484,77 @@ describe('App', () => {
         expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
     });
 
+    it('toggles theme between dark and light', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // Default is dark — theme button shows sun icon
+        const themeBtn = screen.getByTitle('Switch to light theme');
+        expect(screen.getByTestId('icon-sun')).toBeInTheDocument();
+        expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+
+        // Click to switch to light
+        fireEvent.click(themeBtn);
+        expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+        expect(screen.getByTestId('icon-moon')).toBeInTheDocument();
+        expect(screen.getByTitle('Switch to dark theme')).toBeInTheDocument();
+
+        // Click to switch back to dark
+        fireEvent.click(screen.getByTitle('Switch to dark theme'));
+        expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+        expect(screen.getByTestId('icon-sun')).toBeInTheDocument();
+    });
+
+    it('opens and closes hamburger menu', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        const menuBtn = screen.getByTitle('Menu');
+
+        // Menu starts closed — action buttons are in the DOM but hidden via CSS
+        // (container query controls visibility, but in jsdom they're always rendered)
+
+        // Open menu
+        fireEvent.click(menuBtn);
+        // Buttons should still be accessible
+        expect(screen.getByTitle('Share Pattern')).toBeInTheDocument();
+        expect(screen.getByTitle('Help')).toBeInTheDocument();
+        expect(screen.getByTitle('Go Back to Setup')).toBeInTheDocument();
+
+        // Close menu by clicking outside
+        fireEvent.mouseDown(document.body);
+        // Menu button still present
+        expect(screen.getByTitle('Menu')).toBeInTheDocument();
+    });
+
+    it('closes menu when an action is selected', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // Open menu and click Help — should open help and close menu
+        fireEvent.click(screen.getByTitle('Menu'));
+        fireEvent.click(screen.getByTitle('Help'));
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+    });
+
+    it('theme toggle works from within the menu', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // Open menu, toggle theme
+        fireEvent.click(screen.getByTitle('Menu'));
+        fireEvent.click(screen.getByTitle('Switch to light theme'));
+        expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    });
+
     it('loads shared URL with kit selection', () => {
         const rows = INSTRUMENTS.length;
         const steps = 16;

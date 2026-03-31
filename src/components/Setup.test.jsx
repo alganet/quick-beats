@@ -102,7 +102,7 @@ describe('Setup', () => {
 
         const fourFourButton = screen.getByText('4/4').closest('button');
         // Check that it has the selected border class
-        expect(fourFourButton).toHaveClass('border-[#22d3ee]');
+        expect(fourFourButton).toHaveClass('border-accent');
     });
 
     it('should show pulse indicator on selected signature', () => {

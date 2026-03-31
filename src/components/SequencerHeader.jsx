@@ -28,7 +28,7 @@ export function SequencerHeader({
 
     return (
         <div
-            className={`flex h-6 md:h-8 ${GRID_LAYOUT.headerOffsetClass} border-[#1e1e1e] bg-[#111] ${config.gapClass} cursor-pointer`}
+            className={`flex h-6 md:h-8 ${GRID_LAYOUT.headerOffsetClass} border-border-dim bg-surface-1 ${config.gapClass} cursor-pointer`}
             onClick={handleClick}
         >
             {[...Array(stepCount)].map((_, i) => {
@@ -36,10 +36,10 @@ export function SequencerHeader({
                 return (
                     <div
                         key={i}
-                        className={`flex-none ${config.cellClass} flex items-center justify-center text-[10px] font-mono border-b-transparent hover:border-b-[#22d3ee] border-l-[2px] border-l-transparent border-b-[2px] border-r-[2px] border-r-transparent transition-colors
+                        className={`flex-none ${config.cellClass} flex items-center justify-center text-[10px] font-mono border-b-transparent hover:border-b-accent border-l-[2px] border-l-transparent border-b-[2px] border-r-[2px] border-r-transparent transition-colors
                     ${(i + 1) % grouping === 0 ? config.groupGapClass : ''}
-                ${i === currentStep ? 'text-[#22d3ee] font-bold' : 'text-slate-600'}
-                ${i % stepsPerMeasure === 0 ? 'border-0 border-t-2 border-t-[#555]' : ''}
+                ${i === currentStep ? 'text-accent font-bold' : 'text-fg-dim'}
+                ${i % stepsPerMeasure === 0 ? 'border-0 border-t-2 border-t-border-bright' : ''}
                 ${pendingDelete === headerMeasureIdx ? 'opacity-30' : ''}
                 `}
                     >

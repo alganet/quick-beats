@@ -32,10 +32,10 @@ export function InstrumentRow({
     const rightSpacerWidth = Math.max(0, totalWidth - leftSpacerWidth - windowWidth);
 
     return (
-        <div data-grid-row="true" className={`flex items-center ${config.heightClass} group hover:bg-white/[0.02]`}>
+        <div data-grid-row="true" className={`flex items-center ${config.heightClass} group hover:bg-highlight/[0.02]`}>
             {/* Sticky Instrument Label - Narrowed for Icons */}
-            <div data-grid-label="true" className={`sticky left-0 ${GRID_LAYOUT.rowLabelClass} flex-shrink-0 flex items-center justify-center z-20 bg-[#111] h-full shadow-[2px_0_5px_#111]`} title={instrument}>
-                <Icon id={INSTRUMENT_ICONS[instrument] || 'kick'} className="w-5 h-5 text-slate-400" />
+            <div data-grid-label="true" className={`sticky left-0 ${GRID_LAYOUT.rowLabelClass} flex-shrink-0 flex items-center justify-center z-20 bg-surface-1 h-full shadow-[2px_0_5px_var(--color-surface-1)]`} title={instrument}>
+                <Icon id={INSTRUMENT_ICONS[instrument] || 'kick'} className="w-5 h-5 text-fg-secondary" />
             </div>
             <div
                 data-grid-lane="true"

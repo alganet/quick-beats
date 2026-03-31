@@ -43,7 +43,7 @@ describe('ContextMenu', () => {
         );
 
         const alternateOption = screen.getByText('Alternate');
-        expect(alternateOption.closest('div')).toHaveClass('bg-[#3b82f6]');
+        expect(alternateOption.closest('div')).toHaveClass('bg-primary');
     });
 
     it('should show repeat pattern correctly', () => {
