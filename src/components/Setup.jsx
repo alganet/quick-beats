@@ -13,7 +13,7 @@ export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) 
                 onClick={onShowHelp}
                 className="absolute top-4 right-6 text-fg-faint hover:text-fg transition-colors font-mono text-[10px] uppercase tracking-tighter"
             >
-                v1.2.7
+                v1.2.8
             </button>
             <div className="max-w-2xl w-full">
                 <div className="text-center mb-8 md:mb-16">
