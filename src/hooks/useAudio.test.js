@@ -18,63 +18,75 @@ vi.mock('tone', () => {
         bpm: { value: 120 },
         state: 'stopped'
     };
-    
-    // Update state when methods are called
     transportMock.start.mockImplementation(() => { transportMock.state = 'started'; });
     transportMock.stop.mockImplementation(() => { transportMock.state = 'stopped'; });
 
     return {
-        Players: vi.fn(),
+        Player: vi.fn(),
+        Gain: vi.fn(),
         Loop: vi.fn((cb) => ({ start: vi.fn(), dispose: vi.fn(), callback: cb })),
         Transport: transportMock,
         getTransport: vi.fn().mockReturnValue(transportMock),
         getDraw: vi.fn().mockReturnValue({
             schedule: vi.fn((cb) => cb()) // Execute callback immediately for testing
         }),
-        Draw: {
-            schedule: vi.fn((cb) => cb()) 
-        },
         start: vi.fn().mockResolvedValue(),
         loaded: vi.fn().mockResolvedValue(),
         now: vi.fn().mockReturnValue(0),
+        immediate: vi.fn().mockReturnValue(0),
         Time: (val) => ({ toSeconds: () => parseFloat(val) })
     };
 });
 
 describe('useAudio', () => {
-    let mockPlayersInstance;
+    let createdPlayers;
+    let createdGains;
     let mockLoopInstance;
 
+    // Gain is constructed first, then Player.connect(gain) per instrument, so the
+    // k-th Player pairs with the k-th Gain.
+    const chainFor = (name) => {
+        const clean = KITS['black-pearl'].samples[name].replace(/^\//, '');
+        const idx = createdPlayers.findIndex((p) => p.url.includes(clean));
+        return { player: createdPlayers[idx], gain: createdGains[idx] };
+    };
+
     beforeEach(() => {
-        // Reset mocks
         vi.clearAllMocks();
-        
-        // Reset Transport state
-        if (Tone.Transport) {
-            Tone.Transport.state = 'stopped';
-        }
+        if (Tone.Transport) Tone.Transport.state = 'stopped';
 
-        // Setup Players mock instance
-        mockPlayersInstance = {
-            toDestination: vi.fn().mockReturnThis(),
-            dispose: vi.fn(),
-            player: vi.fn().mockReturnValue({
+        createdPlayers = [];
+        createdGains = [];
+
+        Tone.Gain.mockImplementation(function () {
+            const g = {
+                gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
+                toDestination: vi.fn().mockReturnThis(),
+                connect: vi.fn().mockReturnThis(),
+                dispose: vi.fn(),
+            };
+            createdGains.push(g);
+            return g;
+        });
+        Tone.Player.mockImplementation(function (url) {
+            const p = {
+                url,
+                fadeOut: 0,
+                connect: vi.fn().mockReturnThis(),
                 start: vi.fn().mockReturnThis(),
-                stop: vi.fn().mockReturnThis()
-            }),
-            has: vi.fn().mockReturnValue(true)
-        };
-        
-        // Mock the constructor behavior
-        Tone.Players.mockImplementation(function() { return mockPlayersInstance; });
+                stop: vi.fn(),
+                dispose: vi.fn(),
+            };
+            createdPlayers.push(p);
+            return p;
+        });
 
-        // Setup Loop mock instance
         mockLoopInstance = {
             start: vi.fn().mockReturnThis(),
             stop: vi.fn().mockReturnThis(),
-            dispose: vi.fn()
+            dispose: vi.fn(),
         };
-        Tone.Loop.mockImplementation(function(cb) {
+        Tone.Loop.mockImplementation(function (cb) {
             mockLoopInstance.callback = cb;
             return mockLoopInstance;
         });
@@ -82,52 +94,34 @@ describe('useAudio', () => {
 
     it('lazy-loads default kit on demand', async () => {
         const { result } = renderHook(() => useAudio());
+        expect(Tone.Player).not.toHaveBeenCalled();
 
-        // No automatic load on mount
-        expect(Tone.Players).not.toHaveBeenCalled();
-
-        // Explicitly load kit (simulates user-driven load)
         await act(async () => { await result.current.loadKit('black-pearl'); });
 
-        expect(Tone.Players).toHaveBeenCalled();
+        expect(Tone.Player).toHaveBeenCalled();
+        expect(Tone.Gain).toHaveBeenCalled();
         expect(Tone.loaded).toHaveBeenCalled();
         expect(result.current.isLoaded).toBe(true);
     });
 
     it('toggles playback', async () => {
         const { result } = renderHook(() => useAudio());
-
-        // Ensure kit is loaded before attempting to play
         await act(async () => { await result.current.loadKit('black-pearl'); });
 
-        // Start
-        await act(async () => {
-             result.current.togglePlay();
-        });
-
+        await act(async () => { result.current.togglePlay(); });
         expect(Tone.start).toHaveBeenCalled();
         expect(Tone.Transport.start).toHaveBeenCalled();
         expect(result.current.isPlaying).toBe(true);
 
-        // Move playhead to a non-zero step and ensure stopping preserves it
-        act(() => {
-            result.current.setStep(4);
-        });
+        act(() => { result.current.setStep(4); });
         expect(result.current.currentStep).toBe(4);
 
-        // Stop (pause) — should NOT reset currentStep
-        act(() => {
-            result.current.togglePlay();
-        });
-
+        act(() => { result.current.togglePlay(); });
         expect(Tone.Transport.stop).toHaveBeenCalled();
         expect(result.current.isPlaying).toBe(false);
         expect(result.current.currentStep).toBe(4);
 
-        // Resume should set isPlaying true and keep the same step
-        await act(async () => {
-            await result.current.togglePlay();
-        });
+        await act(async () => { await result.current.togglePlay(); });
         expect(result.current.isPlaying).toBe(true);
     });
 
@@ -137,7 +131,6 @@ describe('useAudio', () => {
 
         const { result } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
-
         await act(async () => { await result.current.togglePlay(); });
         expect(navigator.wakeLock.request).toHaveBeenCalledWith('screen');
     });
@@ -148,10 +141,8 @@ describe('useAudio', () => {
 
         const { result } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
-
         await act(async () => { await result.current.togglePlay(); });
         act(() => { result.current.togglePlay(); });
-
         expect(sentinel.release).toHaveBeenCalled();
     });
 
@@ -162,171 +153,265 @@ describe('useAudio', () => {
         const { result, unmount } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
         await act(async () => { await result.current.togglePlay(); });
-
         unmount();
         expect(sentinel.release).toHaveBeenCalled();
     });
 
     it('updates BPM', () => {
         const { result } = renderHook(() => useAudio());
-        
-        act(() => {
-            result.current.setBpm(140);
-        });
-
+        act(() => { result.current.setBpm(140); });
         expect(Tone.Transport.bpm.value).toBe(140);
     });
-    
+
     it('updates grid ref', () => {
         const { result } = renderHook(() => useAudio());
-        const newGrid = [[true, false], [false, true]];
-        
-        act(() => {
-            result.current.updateGrid(newGrid);
-        });
-        
-        // Unfortunately usage of gridRef is internal to step logic, 
-        // we might not observe it directly unless we run the sequencer loop
+        act(() => { result.current.updateGrid([[true, false], [false, true]]); });
     });
-
 
     it('sets step manually', () => {
         const { result } = renderHook(() => useAudio());
-        
-        act(() => {
-            result.current.setStep(5);
-        });
-        
+        act(() => { result.current.setStep(5); });
         expect(result.current.currentStep).toBe(5);
     });
 
     it('plays a single note', async () => {
         const { result } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
-        
-        act(() => {
-            result.current.playNote('Kick');
-        });
-        
-        expect(mockPlayersInstance.player).toHaveBeenCalledWith('Kick');
-        expect(mockPlayersInstance.player().start).toHaveBeenCalled();
+        act(() => { result.current.playNote('Kick'); });
+        expect(chainFor('Kick').player.start).toHaveBeenCalled();
     });
 
-    it('executes loop logic', async () => {
+    it('executes loop logic (flat playback, no humanization)', async () => {
         const { result } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
-        
-        // Ensure grid is set
-        // Mock default kit has 7 instruments. We provide grid for first instrument (Kick) 
-        // and empty for others implicitly or loop handles undefined rows gracefully?
-        // useAudio code: if (currentGrid[rowIndex] && currentGrid[rowIndex][step])
-        const grid = [[true, false]]; // Row 0: Kick. 2 steps.
-        
-        act(() => {
-            result.current.updateGrid(grid);
-            // Also need to reset step to 0 ? It defaults to 0.
-        });
-        
-        // Find the Loop callback
-        expect(Tone.Loop).toHaveBeenCalled();
-        // The callback is the first argument
-        const loopCallback = Tone.Loop.mock.calls[0][0];
+        act(() => { result.current.updateGrid([[true, false]]); }); // Kick row, 2 steps
 
-        // Execute loop callback for step 0
-        act(() => {
-             loopCallback(10); // time = 10
-        });
-        
-        // Check if Kick started
-        // Note: players.has('Kick') is mocked to true
-        // INSTRUMENTS[0] is 'Kick'
-        expect(mockPlayersInstance.player).toHaveBeenCalledWith('Kick');
-        expect(mockPlayersInstance.player().start).toHaveBeenCalledWith(10, 0);
-        expect(mockPlayersInstance.player().stop).not.toHaveBeenCalled();
-        
-        // Check step update
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+        act(() => { loopCallback(10); }); // step 0
+
+        const kick = chainFor('Kick');
+        expect(kick.player.start).toHaveBeenCalledWith(10, 0);
+        // Optimization: gain is already 1, so the hot path writes no Web Audio
+        // params — just .start(), like the original engine.
+        expect(kick.gain.gain.setValueAtTime).not.toHaveBeenCalled();
         expect(result.current.currentStep).toBe(0);
-        
-        // Execute again for step 1 (empty)
-        // mock has() returns true always, but grid at step 1 is false.
-        mockPlayersInstance.player.mockClear();
-        
-        act(() => {
-             loopCallback(11);
-        });
-        
+
+        createdPlayers.forEach((p) => p.start.mockClear());
+        act(() => { loopCallback(11); }); // step 1 (empty)
         expect(result.current.currentStep).toBe(1);
-        expect(mockPlayersInstance.player).not.toHaveBeenCalled();
+        expect(createdPlayers.every((p) => p.start.mock.calls.length === 0)).toBe(true);
+    });
+
+    it('applies humanized velocity + microtiming when enabled', async () => {
+        const { result } = renderHook(() => useAudio());
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+        act(() => {
+            result.current.updateGrid([[true, false]]);
+            result.current.setPerfLayer([[{ vel: 0.5, offsetSec: 0.02 }, null]]);
+            result.current.setHumanizeEnabled(true);
+        });
+
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+        act(() => { loopCallback(10); });
+
+        const kick = chainFor('Kick');
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 10.02);
+        expect(kick.player.start).toHaveBeenCalledWith(10.02, 0);
+    });
+
+    it('does not push an on-grid humanized hit forward when the event time sits inside the lookahead window', async () => {
+        // Regression: the loop's `time` is a future event INSIDE the context
+        // lookahead, so time <= now() (now = currentTime + lookAhead). The "never
+        // schedule in the past" floor must use immediate() (raw currentTime), not
+        // now(); otherwise a zero-offset hit gets clamped forward to now()+lookAhead.
+        Tone.immediate.mockReturnValue(9.95); // raw currentTime
+        Tone.now.mockReturnValue(10.05);      // currentTime + 0.1 lookAhead
+        const { result } = renderHook(() => useAudio());
+        const loop = await enableHumanized(
+            result,
+            { vel: 1, offsetSec: 0 }, // full gain, on-grid
+            { timing: 1, velocity: 1 },
+        );
+        act(() => { loop(10); }); // event time 10: ahead of currentTime, behind now()
+        const kick = chainFor('Kick');
+        // Plays exactly at its scheduled time, not clamped to now()+0.001.
+        expect(kick.player.start).toHaveBeenCalledWith(10, 0);
+    });
+
+    it('clamps a genuinely early (negative-offset) hit up to the current time, never the past', async () => {
+        // The other side of the clamp: a hit pushed before raw currentTime must
+        // land on immediate(), not in the past (Web Audio would drop it).
+        Tone.immediate.mockReturnValue(10);
+        const { result } = renderHook(() => useAudio());
+        const loop = await enableHumanized(
+            result,
+            { vel: 0.5, offsetSec: -0.05 }, // 10 + (-0.05) = 9.95 < earliest(10)
+            { timing: 1, velocity: 1 },
+        );
+        act(() => { loop(10); });
+        const kick = chainFor('Kick');
+        expect(kick.player.start).toHaveBeenCalledWith(10, 0); // clamped up to immediate()
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 10);
+    });
+
+    it('restores full gain on a flat (no perf entry) hit following a ghost hit', async () => {
+        const { result } = renderHook(() => useAudio());
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+        act(() => {
+            result.current.updateGrid([[true, true]]); // 2 kicks
+            // step 0 = ghost (0.5), step 1 = active but no perf entry -> flat fallback
+            result.current.setPerfLayer([[{ vel: 0.5, offsetSec: 0 }, null]]);
+            result.current.setHumanizeOptions({ timing: 1, velocity: 1 });
+            result.current.setHumanizeEnabled(true);
+        });
+        const loop = Tone.Loop.mock.calls[0][0];
+        act(() => { loop(10); }); // ghost -> gain 0.5
+        act(() => { loop(11); }); // flat fallback -> gain restored to 1
+        const kick = chainFor('Kick');
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 10);
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(1, 11);
+        expect(kick.player.start).toHaveBeenCalledWith(11, 0);
+    });
+
+    const enableHumanized = async (result, perfCell, options) => {
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+        act(() => {
+            result.current.updateGrid([[true, false]]);
+            result.current.setPerfLayer([[perfCell, null]]);
+            if (options) result.current.setHumanizeOptions(options);
+            result.current.setHumanizeEnabled(true);
+        });
+        return Tone.Loop.mock.calls[0][0];
+    };
+
+    it('timing=0 suppresses microtiming (plays on the quantized time)', async () => {
+        const { result } = renderHook(() => useAudio());
+        const loop = await enableHumanized(
+            result,
+            { vel: 0.6, offsetSec: 0.02 },
+            { timing: 0, velocity: 1, attack: 0, release: 0.005 },
+        );
+        act(() => { loop(10); });
+        const kick = chainFor('Kick');
+        expect(kick.player.start).toHaveBeenCalledWith(10, 0); // offset * 0 = 0
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, 10);
+    });
+
+    it('velocity blend reduces gain proportionally', async () => {
+        const { result } = renderHook(() => useAudio());
+        const loop = await enableHumanized(
+            result,
+            { vel: 0.4, offsetSec: 0 },
+            { timing: 1, velocity: 0.5, attack: 0, release: 0.005 },
+        );
+        act(() => { loop(10); });
+        // effVel = 1 + (0.4 - 1) * 0.5 = 0.7
+        expect(chainFor('Kick').gain.gain.setValueAtTime).toHaveBeenCalledWith(0.7, 10);
+    });
+
+    it('velocity=0 leaves the gain at full (no redundant write)', async () => {
+        const { result } = renderHook(() => useAudio());
+        const loop = await enableHumanized(
+            result,
+            { vel: 0.4, offsetSec: 0 },
+            { timing: 1, velocity: 0, attack: 0, release: 0.005 },
+        );
+        act(() => { loop(10); });
+        const kick = chainFor('Kick');
+        // effVel = 1 (already the resting gain) -> no param write, just .start()
+        expect(kick.gain.gain.setValueAtTime).not.toHaveBeenCalled();
+        expect(kick.player.start).toHaveBeenCalledWith(10, 0);
+    });
+
+    it('applies the model velocity + microtiming at full strength', async () => {
+        const { result } = renderHook(() => useAudio());
+        const loop = await enableHumanized(
+            result,
+            { vel: 0.4, offsetSec: 0.05 },
+            { timing: 1, velocity: 1 },
+        );
+        act(() => { loop(10); });
+        const kick = chainFor('Kick');
+        const [g, t] = kick.gain.gain.setValueAtTime.mock.calls.at(-1);
+        expect(g).toBeCloseTo(0.4, 5);
+        expect(t).toBeCloseTo(10.05, 5);
+        expect(kick.player.start.mock.calls.at(-1)[0]).toBeCloseTo(10.05, 5);
+    });
+
+    it('plays flat when humanize on but no perf entry for an active cell', async () => {
+        const { result } = renderHook(() => useAudio());
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+        act(() => {
+            result.current.updateGrid([[true, false]]);
+            result.current.setPerfLayer([[null, null]]);
+            result.current.setHumanizeEnabled(true);
+        });
+
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+        act(() => { loopCallback(10); });
+
+        const kick = chainFor('Kick');
+        // no perf entry -> flat; gain already at resting 1, so no write, just start
+        expect(kick.gain.gain.setValueAtTime).not.toHaveBeenCalled();
+        expect(kick.player.start).toHaveBeenCalledWith(10, 0);
+    });
+
+    it('resets gain back to full after a quiet (ghost) hit', async () => {
+        const { result } = renderHook(() => useAudio());
+        await act(async () => { await result.current.loadKit('black-pearl'); });
+        act(() => {
+            result.current.updateGrid([[true, true]]); // 2 steps, both kick
+            // step 0 = ghost (gain 0.5), step 1 = full (gain 1)
+            result.current.setPerfLayer([[{ vel: 0.5, offsetSec: 0 }, { vel: 1, offsetSec: 0 }]]);
+            result.current.setHumanizeOptions({ timing: 1, velocity: 1, attack: 0, release: 0.005 });
+            result.current.setHumanizeEnabled(true);
+        });
+
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+        act(() => { loopCallback(10); }); // step 0 -> gain 0.5
+        act(() => { loopCallback(11); }); // step 1 -> gain reset to 1
+        const kick = chainFor('Kick');
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 10);
+        expect(kick.gain.gain.setValueAtTime).toHaveBeenCalledWith(1, 11);
     });
 
     it('ignores stale scheduled UI updates after manual seek', async () => {
         const scheduledCallbacks = [];
         Tone.getDraw.mockReturnValue({
-            schedule: vi.fn((cb) => {
-                scheduledCallbacks.push(cb);
-            })
+            schedule: vi.fn((cb) => { scheduledCallbacks.push(cb); })
         });
 
         const { result } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
-
-        act(() => {
-            result.current.updateGrid([[true, false]]);
-        });
+        act(() => { result.current.updateGrid([[true, false]]); });
 
         const loopCallback = Tone.Loop.mock.calls[0][0];
-
-        act(() => {
-            loopCallback(10);
-        });
-
-        act(() => {
-            result.current.setStep(7);
-        });
-
+        act(() => { loopCallback(10); });
+        act(() => { result.current.setStep(7); });
         expect(result.current.currentStep).toBe(7);
-
-        act(() => {
-            scheduledCallbacks[0]();
-        });
-
+        act(() => { scheduledCallbacks[0](); });
         expect(result.current.currentStep).toBe(7);
     });
 
     it('cleans up on unmount', async () => {
         const { result, unmount } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
-
+        expect(createdPlayers.length).toBeGreaterThan(0);
         unmount();
-
-        expect(mockPlayersInstance.dispose).toHaveBeenCalled();
+        expect(createdPlayers.every((p) => p.dispose.mock.calls.length > 0)).toBe(true);
+        expect(createdGains.every((g) => g.dispose.mock.calls.length > 0)).toBe(true);
     });
 
     it('handles audio playback errors gracefully', async () => {
         const { result } = renderHook(() => useAudio());
         await act(async () => { await result.current.loadKit('black-pearl'); });
 
-        // Make player.start throw an error
-        mockPlayersInstance.player.mockReturnValue({
-            start: vi.fn().mockImplementation(() => { throw new Error('Audio error'); }),
-            stop: vi.fn()
-        });
-
-        const grid = [[true, false]];
-        act(() => {
-            result.current.updateGrid(grid);
-        });
+        chainFor('Kick').player.start.mockImplementation(() => { throw new Error('Audio error'); });
+        act(() => { result.current.updateGrid([[true, false]]); });
 
         const loopCallback = Tone.Loop.mock.calls[0][0];
-
-        // Spy on console.warn to verify error is handled
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        
-        // Should not throw - error is caught internally
-        act(() => {
-            loopCallback(10);
-        });
-
+        act(() => { loopCallback(10); });
         expect(warnSpy).toHaveBeenCalled();
         warnSpy.mockRestore();
     });

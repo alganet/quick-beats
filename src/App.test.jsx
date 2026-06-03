@@ -7,6 +7,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import App from './App';
 import { encodeGrid } from './utils/hashState';
 import { INSTRUMENTS } from './data/kit';
+import { COMMON_SIGNATURES } from './data/signatures';
 
 // Mocks
 const mockUseAudio = {
@@ -20,10 +21,23 @@ const mockUseAudio = {
     updateGrid: vi.fn(),
     setStep: vi.fn(),
     playNote: vi.fn(),
+    setPerfLayer: vi.fn(),
+    setHumanizeEnabled: vi.fn(),
+    setHumanizeOptions: vi.fn(),
 };
 
 vi.mock('./hooks/useAudio', () => ({
     useAudio: () => mockUseAudio,
+}));
+
+const mockUseHumanize = {
+    phase: 'idle',
+    compute: vi.fn().mockResolvedValue(null),
+    reset: vi.fn(),
+};
+
+vi.mock('./hooks/useHumanize', () => ({
+    useHumanize: () => mockUseHumanize,
 }));
 
 // Mock child components to verify props and interactions
@@ -41,10 +55,11 @@ vi.mock('./components/Sequencer', () => ({
 }));
 
 vi.mock('./components/Controls', () => ({
-    default: ({ isPlaying, togglePlay, setBpm }) => (
+    default: ({ isPlaying, togglePlay, setBpm, humanizeStatus, onHumanize }) => (
         <div data-testid="mock-controls">
             <button onClick={togglePlay}>{isPlaying ? 'Stop' : 'Play'}</button>
             <input data-testid="bpm-input" onChange={(e) => setBpm(parseInt(e.target.value))} />
+            <button data-testid="humanize-btn" data-status={humanizeStatus} onClick={onHumanize}>Humanize</button>
         </div>
     )
 }));
@@ -91,6 +106,9 @@ describe('App', () => {
         mockUseAudio.isPlaying = false;
         mockUseAudio.updateGrid.mockClear();
         mockUseAudio.playNote.mockClear();
+        mockUseHumanize.phase = 'idle';
+        mockUseHumanize.compute.mockResolvedValue(null);
+        mockUseHumanize.reset.mockClear();
         window.location.hash = '';
     });
 
@@ -120,6 +138,157 @@ describe('App', () => {
         expect(screen.queryByTestId('mock-setup')).not.toBeInTheDocument();
         expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
         expect(mockUseAudio.updateGrid).toHaveBeenCalledWith(grid);
+    });
+
+    const renderWith44 = () => {
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: 16 }, () => false));
+        window.location.hash = `#120|4/4|black-pearl|${encodeGrid(grid)}|v1`;
+        return render(<App />);
+    };
+
+    it('toggling Humanize on (off, 16th-note sig) computes and goes "on"', async () => {
+        mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+        renderWith44();
+        const btn = screen.getByTestId('humanize-btn');
+        expect(btn).toHaveAttribute('data-status', 'off');
+
+        await act(async () => { fireEvent.click(btn); });
+        expect(mockUseHumanize.compute).toHaveBeenCalledTimes(1);
+        expect(mockUseAudio.setPerfLayer).toHaveBeenCalled();
+        expect(mockUseAudio.setHumanizeEnabled).toHaveBeenCalledWith(true);
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+    });
+
+    it('editing the grid while "on" shows "pending"; clicking turns off (engine disabled)', async () => {
+        mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+        renderWith44();
+
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+
+        // edit -> pending (auto re-humanize is queued, not run yet)
+        mockUseHumanize.compute.mockClear();
+        await act(async () => { fireEvent.click(screen.getByTestId('toggle-step-btn')); });
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'pending');
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+
+        // clicking turns it off without computing; the engine is disabled
+        mockUseAudio.setHumanizeEnabled.mockClear();
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+        expect(mockUseAudio.setHumanizeEnabled).toHaveBeenCalledWith(false);
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'off');
+    });
+
+    it('auto re-humanizes after the grid is idle while on', async () => {
+        vi.useFakeTimers();
+        try {
+            mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+            renderWith44();
+
+            await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+            expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+
+            mockUseHumanize.compute.mockClear();
+            await act(async () => { fireEvent.click(screen.getByTestId('toggle-step-btn')); });
+            expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'pending');
+
+            // before idle elapses: still no recompute
+            await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+            expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+
+            // idle window passes -> one recompute -> back to "on"
+            await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+            expect(mockUseHumanize.compute).toHaveBeenCalledTimes(1);
+            expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('shows the spinner while a background re-humanize is computing (layer already applied)', async () => {
+        // First run resolves so a layer is applied (humanizedGrid is set).
+        mockUseHumanize.compute.mockResolvedValueOnce([[{ vel: 0.5, offsetSec: 0 }]]);
+        renderWith44();
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+
+        // The worker is now mid-compute on a background re-humanize. An in-flight
+        // compute must show the spinner even though a layer is already playing.
+        mockUseHumanize.phase = 'computing';
+        await act(async () => { fireEvent.click(screen.getByTestId('toggle-step-btn')); });
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'computing');
+    });
+
+    it('toggling off then on reuses the remembered layer (no recompute)', async () => {
+        mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+        renderWith44();
+
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); }); // on (compute #1)
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); }); // off
+
+        mockUseHumanize.compute.mockClear();
+        mockUseAudio.setHumanizeEnabled.mockClear();
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); }); // on again, unchanged grid
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+        expect(mockUseAudio.setHumanizeEnabled).toHaveBeenCalledWith(true);
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+    });
+
+    it('resets humanization when the time signature changes (Home)', async () => {
+        mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+        renderWith44();
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
+
+        mockUseAudio.setPerfLayer.mockClear();
+        // Home -> timeSignature becomes null, which discards the humanization.
+        await act(async () => { fireEvent.click(screen.getAllByTitle('Go Back to Setup')[0]); });
+        expect(mockUseHumanize.reset).toHaveBeenCalled();
+        expect(mockUseAudio.setPerfLayer).toHaveBeenCalledWith(null);
+        expect(mockUseAudio.setHumanizeEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it('rescales humanized microtiming (no recompute) when bpm changes while on', async () => {
+        mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0.02 }]]);
+        renderWith44();
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+
+        mockUseHumanize.compute.mockClear();
+        mockUseAudio.setPerfLayer.mockClear();
+        // 120 -> 60 doubles the 16th-note length, so offsets scale by oldBpm/newBpm = 2.
+        await act(async () => {
+            fireEvent.change(screen.getByTestId('bpm-input'), { target: { value: '60' } });
+        });
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled(); // rescale, not a model run
+        const rescaled = mockUseAudio.setPerfLayer.mock.calls.at(-1)[0];
+        expect(rescaled[0][0].offsetSec).toBeCloseTo(0.04, 6);
+    });
+
+    it('shows "unavailable" and does not compute for a non-16th-note signature (6/8)', () => {
+        const sig = COMMON_SIGNATURES.find((s) => s.name === '6/8');
+        const steps = sig.beats * sig.stepsPerBeat;
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: steps }, () => false));
+        window.location.hash = `#120|6/8|black-pearl|${encodeGrid(grid)}|v1`;
+        render(<App />);
+
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'unavailable');
+        fireEvent.keyDown(window, { key: 'h' });
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+    });
+
+    it('"h" triggers the humanize action; ignored while typing in an input', async () => {
+        mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+        renderWith44();
+
+        const input = document.createElement('input');
+        document.body.appendChild(input);
+        fireEvent.keyDown(input, { key: 'h' });
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+        input.remove();
+
+        await act(async () => { fireEvent.keyDown(window, { key: 'h' }); });
+        expect(mockUseHumanize.compute).toHaveBeenCalledTimes(1);
     });
 
     it('updates URL hash after loading from a shared URI when grid changes', () => {

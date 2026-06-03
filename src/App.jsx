@@ -5,6 +5,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTheme } from './hooks/useTheme'
 import { useAudio } from './hooks/useAudio'
+import { useHumanize } from './hooks/useHumanize'
+import { rescaleOffsets } from './utils/grooveConvert'
+import { HUMANIZE_STYLE } from './data/humanizeStyle'
 import Sequencer from './components/Sequencer'
 import Controls from './components/Controls'
 import Setup from './components/Setup'
@@ -25,15 +28,32 @@ import {
 
 const ACTION_DELAY_MS = 200;
 const HASH_SYNC_DELAY_MS = 180;
+// How long the grid must sit unedited before an auto re-humanize fires.
+const HUMANIZE_IDLE_MS = 5000;
 
 function App() {
   const [theme, , toggleTheme] = useTheme();
-  const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote } = useAudio();
+  const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote, setPerfLayer, setHumanizeEnabled, setHumanizeOptions } = useAudio();
+  const { phase: humanizePhase, compute: computeHumanize, reset: resetHumanizePhase } = useHumanize();
+  // Humanize is a plain on/off toggle. `humanizeOn` = the user's intent (engine
+  // humanized). `humanizedGrid` is the grid the applied layer was computed from;
+  // when the live `grid` drifts from it we're "pending" — a re-humanize is queued
+  // on a 5s idle timer. Turning off keeps the last layer in memory (perfLayerRef)
+  // so toggling back on is instant when nothing changed. Off is the default.
+  const [humanizeOn, setHumanizeOn] = useState(false);
+  const [humanizedGrid, setHumanizedGrid] = useState(null);
+  const idleHumanizeTimeoutRef = useRef(null);
   const lastHashRef = useRef(typeof window !== 'undefined' && window.location.hash ? window.location.hash.substring(1) : '');
   const bpmApplyTimeoutRef = useRef(null);
   const hashSyncTimeoutRef = useRef(null);
   const keyboardZoomTimeoutRef = useRef(null);
   const keyboardAutoScrollTimeoutRef = useRef(null);
+  // Humanization: the raw performance layer + the bpm its offsets were computed
+  // at, so bpm changes rescale microtiming without re-running the model.
+  const perfLayerRef = useRef(null);
+  const perfBpmRef = useRef(120);
+  const bpmInputRef = useRef(120);
+  const gridRef = useRef([]);
 
   const _parsedHash = typeof window !== 'undefined'
     ? parseShareHash(window.location.hash.substring(1), INSTRUMENTS.length)
@@ -61,6 +81,9 @@ function App() {
     const saved = localStorage.getItem('qb-zoom');
     return saved !== null ? parseInt(saved, 10) : 1;
   });
+
+  // GrooVAE humanize only supports 16th-note grids (4/4, 3/4, 5/4).
+  const humanizeSupported = !!timeSignature && timeSignature.stepsPerBeat === 4;
 
   // Close menu on outside click
   useEffect(() => {
@@ -136,6 +159,101 @@ function App() {
     }, ACTION_DELAY_MS);
   }, [setAutoScroll]);
 
+  // Humanization plays when toggled on and the signature is supported.
+  const humanizeActive = humanizeOn && humanizeSupported;
+  // "Pending": on, but the live grid drifted from the layer we computed (editing
+  // swaps the `grid` reference) — a re-humanize is queued on the idle timer.
+  const humanizePending = humanizeActive && grid.length > 0 && grid !== humanizedGrid;
+
+  // Run the model for `g` and apply the result. The worker client supersedes by
+  // request id (latest-wins), so a stale result resolves to null and is dropped.
+  const runHumanize = useCallback((g) => {
+    if (!g || g.length === 0) return;
+    const bpm = bpmInputRef.current;
+    computeHumanize(g, bpm).then((layer) => {
+      if (!layer) return; // failed (phase=error) or superseded by a newer call
+      // Offsets are in seconds for `bpm`; if the tempo changed while the worker
+      // ran, rescale to the live bpm so microtiming matches playback.
+      const liveBpm = bpmInputRef.current;
+      const applied = liveBpm === bpm ? layer : rescaleOffsets(layer, bpm, liveBpm);
+      perfLayerRef.current = applied;
+      perfBpmRef.current = liveBpm;
+      setPerfLayer(applied);
+      setHumanizedGrid(g); // the grid this layer now represents
+    });
+  }, [computeHumanize, setPerfLayer]);
+
+  // The Humanize button is a toggle:
+  //   off -> on : humanize now (reuse the remembered layer if it still matches)
+  //   on  -> off: stop humanizing; keep the last layer in memory
+  //   error     : clicking retries the compute (stays on)
+  // While on, edits auto re-humanize after a 5s idle (see the effect below).
+  const humanizeAction = useCallback(() => {
+    if (!humanizeSupported) return;
+    if (humanizePhase === 'error') { // retry from the error popover
+      runHumanize(gridRef.current);
+      return;
+    }
+    if (humanizeOn) {
+      setHumanizeOn(false); // the effect disables the engine; layer is remembered
+      return;
+    }
+    const g = gridRef.current;
+    if (!g || g.length === 0) return;
+    setHumanizeOn(true);
+    // Reuse a remembered layer that still matches the grid; otherwise compute now.
+    if (!(perfLayerRef.current && humanizedGrid === g)) runHumanize(g);
+  }, [humanizeSupported, humanizePhase, humanizeOn, humanizedGrid, runHumanize]);
+
+  // While on, re-humanize once the grid has been idle for HUMANIZE_IDLE_MS.
+  // Resetting the timer on every grid change debounces rapid edits into a single
+  // model run. We never schedule while a compute is already in flight, so runs
+  // can't overlap; when it finishes this effect re-runs and reschedules if the
+  // grid is still pending.
+  useEffect(() => {
+    if (idleHumanizeTimeoutRef.current) {
+      clearTimeout(idleHumanizeTimeoutRef.current);
+      idleHumanizeTimeoutRef.current = null;
+    }
+    if (!humanizePending || humanizePhase === 'computing') return undefined;
+    idleHumanizeTimeoutRef.current = setTimeout(() => {
+      idleHumanizeTimeoutRef.current = null;
+      runHumanize(gridRef.current);
+    }, HUMANIZE_IDLE_MS);
+    return () => {
+      if (idleHumanizeTimeoutRef.current) {
+        clearTimeout(idleHumanizeTimeoutRef.current);
+        idleHumanizeTimeoutRef.current = null;
+      }
+    };
+  }, [humanizePending, humanizePhase, grid, runHumanize]);
+
+  // Discard humanization entirely. Used when the user switches time signature —
+  // they're writing a different beat, so carrying the old groove (or its
+  // remembered layer) makes no sense.
+  const resetHumanization = useCallback(() => {
+    if (idleHumanizeTimeoutRef.current) {
+      clearTimeout(idleHumanizeTimeoutRef.current);
+      idleHumanizeTimeoutRef.current = null;
+    }
+    setHumanizeOn(false);
+    setHumanizedGrid(null);
+    perfLayerRef.current = null;
+    perfBpmRef.current = bpmInputRef.current;
+    setPerfLayer(null);
+    resetHumanizePhase();
+  }, [setPerfLayer, resetHumanizePhase]);
+
+  // Any time-signature change (new beat from Setup, or Home -> null) wipes the
+  // humanization. Keyed on the signature object, which only changes on confirm /
+  // reset, so editing the grid never trips this.
+  const prevSigRef = useRef(timeSignature);
+  useEffect(() => {
+    if (prevSigRef.current === timeSignature) return;
+    prevSigRef.current = timeSignature;
+    resetHumanization();
+  }, [timeSignature, resetHumanization]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ignore when typing in form controls
@@ -177,6 +295,12 @@ function App() {
         return;
       }
 
+      // h => humanize / remove (same action as clicking the button)
+      if (typeof e.key === 'string' && e.key.toLowerCase() === 'h') {
+        humanizeAction();
+        return;
+      }
+
       // Preserve existing Escape behavior for modals
       if (e.key === 'Escape') {
         setIsShareOpen(false);
@@ -186,7 +310,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlay, setBpmInput, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle]);
+  }, [togglePlay, setBpmInput, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle, humanizeAction]);
 
   // Update hash when state changes
   useEffect(() => {
@@ -237,6 +361,47 @@ function App() {
       updateGrid(grid);
     }
   }, [grid, updateGrid]);
+
+  // Mirror live values into refs so the click action reads fresh state.
+  useEffect(() => { bpmInputRef.current = bpmInput; }, [bpmInput]);
+  useEffect(() => { gridRef.current = grid; }, [grid]);
+
+  // Drive the engine: humanized when active, flat (gain 1, no offset) otherwise.
+  useEffect(() => {
+    setHumanizeEnabled(humanizeActive);
+  }, [humanizeActive, setHumanizeEnabled]);
+
+  useEffect(() => {
+    setHumanizeOptions(HUMANIZE_STYLE);
+  }, [setHumanizeOptions]);
+
+  // Rescale microtiming when bpm changes — cheap, no model run, no recompute.
+  useEffect(() => {
+    if (!humanizeOn) return;
+    const layer = perfLayerRef.current;
+    if (!layer || perfBpmRef.current === bpmInput) return;
+    const rescaled = rescaleOffsets(layer, perfBpmRef.current, bpmInput);
+    perfLayerRef.current = rescaled;
+    perfBpmRef.current = bpmInput;
+    setPerfLayer(rescaled);
+  }, [bpmInput, humanizeOn, setPerfLayer]);
+
+  // Button status for the UI (see HumanizeButton).
+  //   computing : a model run is in flight (first humanize OR a background
+  //               re-humanize) -> spinner
+  //   pending   : on, grid drifted, waiting on the idle timer to fire -> "!"
+  //   on        : humanized and up to date
+  const humanizeStatus = !humanizeSupported
+    ? 'unavailable'
+    : humanizePhase === 'error'
+      ? 'error'
+      : !humanizeOn
+        ? 'off'
+        : humanizePhase === 'computing'
+          ? 'computing'
+          : humanizePending
+            ? 'pending'
+            : 'on';
 
   const handlePreview = (sig) => {
     setPreviewSig(sig);
@@ -394,6 +559,8 @@ function App() {
             canScroll={canScroll}
             zoom={zoom}
             setZoom={setZoom}
+            humanizeStatus={humanizeStatus}
+            onHumanize={humanizeAction}
           />
         </div>
 

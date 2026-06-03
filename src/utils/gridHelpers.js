@@ -54,19 +54,43 @@ export const calculateBulkUpdate = (grid, row, col, mode, timeSignature) => {
     });
 };
 
-export const calculateNewMeasure = (grid, timeSignature) => {
+// Musically relevant periods for detecting a repeating pattern in a row:
+// subdivision, pulse/grouping, 2-beat backbeat, measure, and multi-measure.
+export const measurePeriods = (timeSignature) => {
     const stepsPerMeasure = timeSignature.beats * timeSignature.stepsPerBeat;
     const grouping = timeSignature.grouping;
-    const currentTotalSteps = grid[0].length;
-
-    // Musically relevant periods: subdivision, pulse/grouping, 2-beat backbeat, measure, and multi-measure
-    const periods = [
+    return [
         1, // Subdivision (e.g. constant 16th notes)
         grouping,
         grouping * 2, // 2-beat backbeat (essential for alternating Kick/Snare in odd meters)
         stepsPerMeasure,
-        stepsPerMeasure * 2
+        stepsPerMeasure * 2,
     ];
+};
+
+// For one row and one period, per-phase recurrence stats across every position
+// congruent to that phase mod `period`: hit `count`, `total` positions, and
+// `freq` = count/total.
+export const phaseStats = (row, period) => {
+    const count = new Array(period).fill(0);
+    const total = new Array(period).fill(0);
+    for (let i = 0; i < period; i++) {
+        for (let base = i; base < row.length; base += period) {
+            total[i]++;
+            if (row[base]) count[i]++;
+        }
+    }
+    const freq = count.map((c, i) => (total[i] ? c / total[i] : 0));
+    return { freq, count, total };
+};
+
+// Per-phase hit frequency (occurrences / total) for a row at a given period.
+export const phaseFrequencies = (row, period) => phaseStats(row, period).freq;
+
+export const calculateNewMeasure = (grid, timeSignature) => {
+    const stepsPerMeasure = timeSignature.beats * timeSignature.stepsPerBeat;
+    const currentTotalSteps = grid[0].length;
+    const periods = measurePeriods(timeSignature);
 
     return grid.map(row => {
         const newMeasureSteps = Array(stepsPerMeasure).fill(null);
@@ -78,17 +102,12 @@ export const calculateNewMeasure = (grid, timeSignature) => {
             const isSeedClone = (period === currentTotalSteps);
             if (!isSeedClone && period * 2 > currentTotalSteps) continue;
 
+            const freqs = phaseFrequencies(row, period);
             const pattern = Array(period).fill(false);
             const confidence = Array(period).fill(0);
 
             for (let i = 0; i < period; i++) {
-                let occurrences = 0;
-                let total = 0;
-                for (let base = i; base < currentTotalSteps; base += period) {
-                    total++;
-                    if (row[base]) occurrences++;
-                }
-                const freq = occurrences / total;
+                const freq = freqs[i];
                 // Threshold 0.7 as manually adjusted by user for better detection
                 pattern[i] = freq >= 0.70;
                 // Confidence is high if it's very consistent
