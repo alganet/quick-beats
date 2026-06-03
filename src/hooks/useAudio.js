@@ -19,6 +19,25 @@ export function useAudio() {
     const perfTickRef = useRef(0);
     const wakeLockRef = useRef(null);
     const playheadVersionRef = useRef(0);
+    // Humanization "performance layer" applied non-destructively at playback.
+    // perfLayerRef.current[row][step] = null | { vel: 0..1, offsetSec }
+    const perfLayerRef = useRef(null);
+    const humanizeOnRef = useRef(false);
+    // Style scalars (see data/humanizeStyle). Used only to (re)build appliedLayerRef.
+    const humanizeOptionsRef = useRef({ timing: 1, velocity: 1 });
+    // Precomputed per-hit playback values { gain, offsetSec } | null — built off the
+    // audio thread so the loop reads, never computes.
+    const appliedLayerRef = useRef(null);
+
+    const disposePlayers = useCallback(() => {
+        const current = players.current;
+        if (!current) return;
+        Object.values(current).forEach(({ player, gain }) => {
+            try { player?.dispose?.(); } catch { /* ignore */ }
+            try { gain?.dispose?.(); } catch { /* ignore */ }
+        });
+        players.current = null;
+    }, []);
 
     const loadKit = useCallback(async (kitId) => {
         const kit = KITS[kitId];
@@ -26,34 +45,38 @@ export function useAudio() {
 
         setIsLoaded(false);
         isLoadedRef.current = false;
-        if (players.current) {
-            players.current.dispose();
-        }
+        disposePlayers();
 
-        const resolvedSamples = {};
+        // One Player -> Gain -> destination chain per instrument so we can apply
+        // a per-hit gain (velocity) when humanization is on. A single Tone.Players
+        // has no per-hit gain. players.current = { [name]: { player, gain } }.
+        const chains = {};
         Object.entries(kit.samples).forEach(([name, path]) => {
             // Remove leading slash if present and prepend BASE_URL
             const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-            resolvedSamples[name] = `${import.meta.env.BASE_URL}${cleanPath}`;
+            const url = `${import.meta.env.BASE_URL}${cleanPath}`;
+            const gain = new Tone.Gain(1).toDestination();
+            const player = new Tone.Player(url).connect(gain);
+            // Track the last-applied gain so the loop only writes the Web Audio gain
+            // param when it actually changes (a flat beat then just .start()s).
+            chains[name] = { player, gain, lastGain: 1 };
         });
-
-        const newPlayers = new Tone.Players(resolvedSamples).toDestination();
-        players.current = newPlayers;
+        players.current = chains;
 
         await Tone.loaded();
         setIsLoaded(true);
         isLoadedRef.current = true;
         setActiveKit(kitId);
-    }, []);
+    }, [disposePlayers]);
 
     // Ensure players are cleaned up on unmount. Kit loading is done lazily
     // to avoid creating/resuming an AudioContext before a user gesture (browser
     // autoplay policy triggers a console warning otherwise).
     useEffect(() => {
         return () => {
-            if (players.current) players.current.dispose();
+            disposePlayers();
         };
-    }, []);
+    }, [disposePlayers]);
 
     const updateGrid = useCallback((newGrid) => {
         gridRef.current = newGrid;
@@ -154,16 +177,38 @@ export function useAudio() {
                 performance.mark(audioMarkName);
             }
 
-            // Trigger sounds for this step
+            // Trigger sounds for this step. Hot path is intentionally tiny: read a
+            // PRECOMPUTED per-hit value (no humanize math here), write a Web Audio
+            // param only when it actually changes, then start the sample.
+            const layer = humanizeOnRef.current ? appliedLayerRef.current : null;
+            // "Never schedule in the past" floor — the raw context time. NOT now(),
+            // which adds the lookAhead and would shove every hit forward (see the
+            // immediate()-vs-now() regression test in useAudio.test.js).
+            const earliest = layer ? Tone.immediate() : 0;
             INSTRUMENTS.forEach((instrument, rowIndex) => {
-                if (currentGrid[rowIndex] && currentGrid[rowIndex][step]) {
-                    if (players.current && players.current.has(instrument)) {
-                        try {
-                            players.current.player(instrument).start(time, 0);
-                        } catch {
-                            console.warn("Skipped a beat due to audio playback isssue");
+                if (!(currentGrid[rowIndex] && currentGrid[rowIndex][step])) return;
+                const chain = players.current && players.current[instrument];
+                if (!chain) return;
+                try {
+                    const a = layer && layer[rowIndex] && layer[rowIndex][step];
+                    if (a) {
+                        let when = time + a.offsetSec;
+                        if (when < earliest) when = earliest; // never schedule in the past
+                        if (chain.lastGain !== a.gain) {
+                            chain.gain.gain.setValueAtTime(a.gain, when);
+                            chain.lastGain = a.gain;
                         }
+                        chain.player.start(when, 0);
+                    } else {
+                        // Flat playback: restore resting (full) gain only if needed.
+                        if (chain.lastGain !== 1) {
+                            chain.gain.gain.setValueAtTime(1, time);
+                            chain.lastGain = 1;
+                        }
+                        chain.player.start(time, 0);
                     }
+                } catch {
+                    console.warn("Skipped a beat due to audio playback issue");
                 }
             });
 
@@ -208,10 +253,57 @@ export function useAudio() {
 
     const playNote = useCallback((instrument) => {
         if (!isLoaded || !players.current) return;
-        if (players.current.has(instrument)) {
-            players.current.player(instrument).start();
+        const chain = players.current[instrument];
+        if (chain) {
+            chain.gain.gain.setValueAtTime(1, Tone.now());
+            chain.lastGain = 1;
+            chain.player.start();
         }
     }, [isLoaded]);
 
-    return { isLoaded, isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep, playNote };
+    // Humanization wiring (set by the App via useHumanize). The loop reads these
+    // refs directly so updates don't trigger React re-renders.
+    //
+    // All per-hit shaping (velocity blend, timing scale) is precomputed HERE —
+    // off the audio thread — into appliedLayerRef, so the Tone.Loop callback does
+    // no humanize arithmetic. Rebuilt only when the performance layer or the style
+    // options change (rare: on humanize / bpm / style change), never per tick.
+    const buildAppliedLayer = useCallback(() => {
+        const perf = perfLayerRef.current;
+        if (!perf) {
+            appliedLayerRef.current = null;
+            return;
+        }
+        const o = humanizeOptionsRef.current;
+        appliedLayerRef.current = perf.map((row) =>
+            row.map((cell) => {
+                if (!cell) return null;
+                let gain = 1 + (cell.vel - 1) * o.velocity;
+                gain = gain < 0 ? 0 : gain > 1 ? 1 : gain;
+                return { gain, offsetSec: cell.offsetSec * o.timing };
+            }),
+        );
+    }, []);
+
+    const setPerfLayer = useCallback((layer) => {
+        perfLayerRef.current = layer;
+        buildAppliedLayer();
+    }, [buildAppliedLayer]);
+
+    const setHumanizeEnabled = useCallback((on) => {
+        humanizeOnRef.current = !!on;
+    }, []);
+
+    const setHumanizeOptions = useCallback((opts) => {
+        humanizeOptionsRef.current = {
+            timing: opts?.timing ?? 1,
+            velocity: opts?.velocity ?? 1,
+        };
+        buildAppliedLayer();
+    }, [buildAppliedLayer]);
+
+    return {
+        isLoaded, isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm,
+        updateGrid, setStep, playNote, setPerfLayer, setHumanizeEnabled, setHumanizeOptions,
+    };
 }

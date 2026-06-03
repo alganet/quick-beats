@@ -62,6 +62,16 @@ export const IconSprite = () => (
             <path d="M7 8l-4 4 4 4M17 16l4-4-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
             <path d="M7 12h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </symbol>
+        {/* Humanize: a person (make the quantized beat feel human-played) */}
+        <symbol id="icon-humanize" viewBox="0 0 24 24">
+            <circle cx="12" cy="7.5" r="4" fill="currentColor" />
+            <path d="M4 20.5a8 8 0 0 1 16 0 1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" fill="currentColor" />
+        </symbol>
+        {/* A circle centered on the viewBox so animate-spin rotates true about
+            (12,12); the dash leaves a ~quarter gap to read as a spinner. */}
+        <symbol id="icon-spinner" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" strokeDasharray="42 100" />
+        </symbol>
         <symbol id="icon-arrow-left" viewBox="0 0 24 24">
             <path d="M7.99 11H20v2H7.99v3L4 12l3.99-4v3z" fill="currentColor" />
         </symbol>

@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: ISC
 
 import { describe, it, expect } from 'vitest';
-import { 
-    generateGridFromSig, 
-    toggleGridStep, 
-    calculateBulkUpdate, 
-    calculateNewMeasure, 
-    calculateGridWithRemovedMeasure 
+import {
+    generateGridFromSig,
+    toggleGridStep,
+    calculateBulkUpdate,
+    calculateNewMeasure,
+    calculateGridWithRemovedMeasure,
 } from './gridHelpers';
 
 describe('gridHelpers', () => {

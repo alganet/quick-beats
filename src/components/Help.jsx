@@ -74,6 +74,10 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                                 <div>Toggle auto-scroll</div>
                             </div>
                             <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">h</div>
+                                <div>Humanize / remove</div>
+                            </div>
+                            <div className="flex items-center gap-3">
                                 <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">?</div>
                                 <div>Show this help</div>
                             </div>
@@ -125,6 +129,28 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                             When <span className="text-fg">ON</span>, the view follows the playhead automatically.
                             This button only appears when your pattern is wide enough to scroll.
                             Manually scrolling will turn it off.
+                        </p>
+                    </div>
+                </HelpSection>
+
+                {/* Humanize */}
+                <HelpSection title="Humanize (AI)">
+                    <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
+                        <div className="flex items-center gap-3 m-auto flex-shrink-0">
+                            <div className="w-8 h-8 flex items-center justify-center bg-surface-inverted text-fg-on-inverted shadow-[0_0_12px_color-mix(in_srgb,var(--color-highlight)_30%,transparent)]">
+                                <Icon id="humanize" className="w-4 h-4" />
+                            </div>
+                            <span className="text-[10px] font-mono text-green-400">ON</span>
+                        </div>
+                        <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
+                            Click to run a trained AI groove model (GrooVAE) entirely in your browser,
+                            adding human-like <span className="text-fg">velocity</span> and
+                            micro-<span className="text-fg">timing</span> to the quantized grid.
+                            The button lights up when humanized; edit the grid and it shows a
+                             <span className="text-fg"> !</span> while it re-humanizes after a short pause. Click the lit
+                            button to remove it (non-destructive: you get the exact flat pattern back).
+                            <span className="text-fg font-mono text-[10px] bg-surface-5 px-1 py-0.5">h</span> does
+                            the same. Available for 16th-note time signatures (4/4, 3/4, 5/4).
                         </p>
                     </div>
                 </HelpSection>
