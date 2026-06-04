@@ -48,6 +48,27 @@ describe('Pad', () => {
         expect(pad).toHaveClass('bg-primary');
     });
 
+    it('renders the accent hue for a humanized active pad', () => {
+        render(<Pad {...defaultProps} isActive={true} humanized={true} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveClass('bg-accent');
+        expect(pad).not.toHaveClass('bg-primary'); // distinct hue, not the base tone
+    });
+
+    it('keeps the base tone for an active pad the model did not shape', () => {
+        render(<Pad {...defaultProps} isActive={true} humanized={false} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveClass('bg-primary');
+        expect(pad).not.toHaveClass('bg-accent');
+    });
+
+    it('ignores humanized when inactive (no hit, no tint)', () => {
+        render(<Pad {...defaultProps} isActive={false} humanized={true} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveClass('bg-surface-5');
+        expect(pad).not.toHaveClass('bg-accent');
+    });
+
     it('calls toggleStep on click', () => {
         render(<Pad {...defaultProps} />);
         const pad = screen.getByTestId('pad');

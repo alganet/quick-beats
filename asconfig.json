@@ -1,0 +1,18 @@
+{
+  "targets": {
+    "release": {
+      "outFile": "src/wasm/groove.wasm",
+      "optimizeLevel": 3,
+      "shrinkLevel": 0,
+      "converge": false,
+      "noAssert": true
+    }
+  },
+  "options": {
+    "bindings": "raw",
+    "importMemory": true,
+    "exportRuntime": false,
+    "runtime": "stub",
+    "enable": ["simd"]
+  }
+}

@@ -17,6 +17,10 @@ dist
 dist-ssr
 *.local
 
+# AssemblyScript binding stubs (groove.wasm is loaded manually and IS committed)
+src/wasm/groove.js
+src/wasm/groove.d.ts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

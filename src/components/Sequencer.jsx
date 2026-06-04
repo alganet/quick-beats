@@ -18,7 +18,7 @@ import { getGridOriginOffsetPx, isMobileViewport, xToStep } from "../utils/seque
 
 
 
-export default function Sequencer({ isPlaying, togglePlay, grid, toggleStep, bulkUpdateStep, currentStep, stepCount = 16, setStep, addMeasure, removeMeasure, beatsPerMeasure = 4, stepsPerBeat = 4, grouping = 4, autoScroll, setAutoScroll, setCanScroll, zoom }) {
+export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, toggleStep, bulkUpdateStep, currentStep, stepCount = 16, setStep, addMeasure, removeMeasure, beatsPerMeasure = 4, stepsPerBeat = 4, grouping = 4, autoScroll, setAutoScroll, setCanScroll, zoom }) {
     const scrollContainerRef = useRef(null);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [gridOriginOffset, setGridOriginOffset] = useState(getGridOriginOffsetPx(isMobileViewport()));
@@ -197,6 +197,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, toggleStep, bul
                                         instrument={instrument}
                                         rowIdx={rowIdx}
                                         gridRow={grid[rowIdx]}
+                                        humanizedRow={humanizedMask?.[rowIdx]}
                                         stepCount={stepCount}
                                         stepsPerMeasure={stepsPerMeasure}
                                         grouping={grouping}

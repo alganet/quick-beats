@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { encode, humanize, __internals, NUM_STEPS, NUM_CLASSES, DEPTH } from './grooveModel';
+import { encode, humanize, jsBackend, __internals, NUM_STEPS, NUM_CLASSES, DEPTH } from './grooveModel';
 import { f16ToF32 } from './grooveWeights';
 import { gridWindowToInput, ROW_TO_CLASS } from './grooveConvert';
 
@@ -34,6 +34,16 @@ describe('grooveModel internals', () => {
         expect(sigmoid(0)).toBeCloseTo(0.5, 6);
         expect(sigmoid(10)).toBeGreaterThan(0.99);
         expect(sigmoid(-10)).toBeLessThan(0.01);
+    });
+
+    it('jsBackend is tagged kind "js" and computes affine = bias + x . kernel', () => {
+        const weights = new Map([
+            ['k', { data: new Float32Array([1, 0, 1, 0, 1, 1]), shape: [2, 3] }],
+            ['b', { data: new Float32Array([0, 0, 1]), shape: [3] }],
+        ]);
+        const backend = jsBackend(weights);
+        expect(backend.kind).toBe('js');
+        expect(Array.from(backend.affine([new Float32Array([1, 2])], 'k', 'b'))).toEqual([1, 2, 4]);
     });
 });
 
@@ -115,6 +125,11 @@ describe.skipIf(!hasWeights)('grooveModel + real GrooVAE weights', () => {
     it('is deterministic (same input -> same output)', () => {
         const again = humanize(weights, gridWindowToInput(grid, 0));
         expect(again[0][NUM_CLASSES + 0]).toBeCloseTo(out[0][NUM_CLASSES + 0], 6);
+    });
+
+    it('an explicit jsBackend produces the same output as a raw weights Map', () => {
+        const viaBackend = humanize(jsBackend(weights), gridWindowToInput(grid, 0));
+        expect(viaBackend[0][NUM_CLASSES + 0]).toBeCloseTo(out[0][NUM_CLASSES + 0], 10);
     });
 
     it('matches the golden kick velocity within tolerance', () => {

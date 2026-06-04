@@ -5,7 +5,7 @@
 import { memo, useRef, useCallback } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
 
-export const Pad = ({ isActive, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded }) => {
+export const Pad = ({ isActive, humanized, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded }) => {
     const padRef = useRef(null);
 
     const onLongPress = useCallback(() => {
@@ -32,7 +32,7 @@ export const Pad = ({ isActive, rowIdx, colIdx, grouping, config, toggleStep, se
             {...longPressHandlers}
             className={`flex-none cursor-pointer touch-pan-x relative ${config.radiusClass}
                 ${isActive
-                    ? "bg-primary"
+                    ? (humanized ? "bg-accent" : "bg-primary")
                     : "bg-surface-5 hover:bg-border-medium"}
                 ${faded ? 'opacity-30 pointer-events-none' : ''}
             `}

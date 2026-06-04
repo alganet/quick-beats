@@ -23,7 +23,7 @@ class FakeWorker {
                     return;
                 }
                 this.onmessage({ data: { type: 'progress', progress: 0.5 } });
-                this.onmessage({ data: { type: 'ready' } });
+                this.onmessage({ data: { type: 'ready', backend: 'wasm' } });
             });
             return;
         }
@@ -31,7 +31,11 @@ class FakeWorker {
         queueMicrotask(() => {
             if (!this.onmessage) return;
             if (grid === 'BOOM') this.onmessage({ data: { id, error: 'worker failed' } });
-            else this.onmessage({ data: { id, perf: [[{ vel: 0.5, offsetSec: 0 }]] } });
+            else if (grid === 'STREAM') {
+                // one partial window, then the final cumulative layer
+                this.onmessage({ data: { id, perf: [['partial']], done: false } });
+                this.onmessage({ data: { id, perf: [['final']], done: true } });
+            } else this.onmessage({ data: { id, perf: [[{ vel: 0.5, offsetSec: 0 }]] } });
         });
     }
     terminate() {}
@@ -61,6 +65,13 @@ describe('grooveClient', () => {
         expect(perf).toEqual([[{ vel: 0.5, offsetSec: 0 }]]);
     });
 
+    it('streams partials to onPartial and resolves with the final layer', async () => {
+        const partials = [];
+        const final = await computeHumanization('STREAM', 120, (p) => partials.push(p));
+        expect(partials).toEqual([[['partial']]]); // one partial (done:false)
+        expect(final).toEqual([['final']]); // resolved on done:true
+    });
+
     it('forwards grid + bpm to the worker', async () => {
         await computeHumanization([[true]], 90);
         expect(FakeWorker.lastMessage.grid).toEqual([[true]]);
@@ -71,10 +82,11 @@ describe('grooveClient', () => {
         await expect(computeHumanization('BOOM', 120)).rejects.toThrow('worker failed');
     });
 
-    it('warmupWeights reports progress and resolves, reusing the one worker for compute', async () => {
+    it('warmupWeights reports progress and resolves with the backend kind, reusing the one worker for compute', async () => {
         const onProgress = vi.fn();
-        await warmupWeights(onProgress);
+        const backend = await warmupWeights(onProgress);
         expect(onProgress).toHaveBeenCalledWith(0.5);
+        expect(backend).toBe('wasm');
         await computeHumanization([[true]], 120);
         expect(FakeWorker.instances).toHaveLength(1);
         expect(FakeWorker.instances[0].constructor).toBe(FakeWorker);

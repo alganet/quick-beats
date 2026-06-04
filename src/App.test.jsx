@@ -37,6 +37,7 @@ const mockUseHumanize = {
     warmup: vi.fn(),
     modelPhase: 'ready',
     modelProgress: 1,
+    computeBackend: 'js', // default to the slow path so the 5s idle tests hold
 };
 
 vi.mock('./hooks/useHumanize', () => ({
@@ -51,9 +52,9 @@ vi.mock('./hooks/useSamplePreload', () => ({
 
 // Mock child components to verify props and interactions
 vi.mock('./components/Sequencer', () => ({
-    default: ({ toggleStep, addMeasure, removeMeasure, bulkUpdateStep, stepCount, setCanScroll: _ }) => {
+    default: ({ toggleStep, addMeasure, removeMeasure, bulkUpdateStep, stepCount, humanizedMask, setCanScroll: _ }) => {
         return (
-        <div data-testid="mock-sequencer">
+        <div data-testid="mock-sequencer" data-humanized={humanizedMask ? 'yes' : 'no'}>
             <button data-testid="toggle-step-btn" onClick={() => toggleStep(0, 1)}>Toggle Step</button>
             <button data-testid="add-measure-btn" onClick={addMeasure}>Add Measure</button>
             <button data-testid="remove-measure-btn" onClick={() => removeMeasure(0)}>Remove Measure</button>
@@ -121,6 +122,7 @@ describe('App', () => {
         mockUseHumanize.warmup.mockClear();
         mockUseHumanize.modelPhase = 'ready';
         mockUseHumanize.modelProgress = 1;
+        mockUseHumanize.computeBackend = 'js';
         mockUseSamplePreload.ready = true;
         mockUseSamplePreload.progress = 1;
         window.location.hash = '';
@@ -173,6 +175,19 @@ describe('App', () => {
         expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'on');
     });
 
+    it('applies streamed partial layers as they arrive (progressive humanize)', async () => {
+        const partial = [[{ vel: 0.4, offsetSec: 0 }]];
+        const finalLayer = [[{ vel: 0.5, offsetSec: 0 }]];
+        mockUseHumanize.compute.mockImplementation((g, bpm, onPartial) => {
+            onPartial?.(partial); // stream one window before resolving
+            return Promise.resolve(finalLayer);
+        });
+        renderWith44();
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+        expect(mockUseAudio.setPerfLayer).toHaveBeenCalledWith(partial); // partial applied
+        expect(mockUseAudio.setPerfLayer).toHaveBeenCalledWith(finalLayer); // then final
+    });
+
     it('editing the grid while "on" shows "pending"; clicking turns off (engine disabled)', async () => {
         mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
         renderWith44();
@@ -218,6 +233,45 @@ describe('App', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it('re-humanizes after a shorter idle (~1.2s) when the WASM backend is active', async () => {
+        vi.useFakeTimers();
+        try {
+            mockUseHumanize.computeBackend = 'wasm';
+            mockUseHumanize.compute.mockResolvedValue([[{ vel: 0.5, offsetSec: 0 }]]);
+            renderWith44();
+
+            await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); });
+            mockUseHumanize.compute.mockClear();
+            await act(async () => { fireEvent.click(screen.getByTestId('toggle-step-btn')); });
+            expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'pending');
+
+            // below the WASM idle: no recompute yet
+            await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+            expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+
+            // past ~1.2s: one recompute (well before the 5s JS debounce)
+            await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+            expect(mockUseHumanize.compute).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('passes a humanized mask to the Sequencer once a layer streams in (and clears it off)', async () => {
+        mockUseHumanize.compute.mockImplementation((g, bpm, onPartial) => {
+            onPartial?.([[{ vel: 0.5, offsetSec: 0 }]]);
+            return Promise.resolve([[{ vel: 0.5, offsetSec: 0 }]]);
+        });
+        renderWith44();
+        expect(screen.getByTestId('mock-sequencer')).toHaveAttribute('data-humanized', 'no');
+
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); }); // on
+        expect(screen.getByTestId('mock-sequencer')).toHaveAttribute('data-humanized', 'yes');
+
+        await act(async () => { fireEvent.click(screen.getByTestId('humanize-btn')); }); // off
+        expect(screen.getByTestId('mock-sequencer')).toHaveAttribute('data-humanized', 'no');
     });
 
     it('shows the spinner while a background re-humanize is computing (layer already applied)', async () => {

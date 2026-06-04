@@ -9,7 +9,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage']),
+  // dist/coverage are build/test output; src/wasm/* (except groove.wasm) are
+  // AssemblyScript-generated binding stubs we don't hand-edit or use.
+  globalIgnores(['dist', 'coverage', 'src/wasm/*.js', 'src/wasm/*.d.ts']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
