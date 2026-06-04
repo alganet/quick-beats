@@ -30,14 +30,17 @@ import {
 
 const ACTION_DELAY_MS = 200;
 const HASH_SYNC_DELAY_MS = 180;
-// How long the grid must sit unedited before an auto re-humanize fires.
-const HUMANIZE_IDLE_MS = 5000;
+// How long the grid must sit unedited before an auto re-humanize fires. WASM
+// compute is ~5x faster, so it can react much sooner; the JS fallback waits
+// longer to avoid recomputing mid-edit on the slow path.
+const HUMANIZE_IDLE_MS_WASM = 1200;
+const HUMANIZE_IDLE_MS_JS = 5000;
 
 function App() {
   const [theme, , toggleTheme] = useTheme();
   const { ready: assetsReady, progress: assetsProgress } = useSamplePreload();
   const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote, setPerfLayer, setHumanizeEnabled, setHumanizeOptions } = useAudio();
-  const { phase: humanizePhase, compute: computeHumanize, reset: resetHumanizePhase, warmup: warmupModel, modelPhase, modelProgress } = useHumanize();
+  const { phase: humanizePhase, compute: computeHumanize, reset: resetHumanizePhase, warmup: warmupModel, modelPhase, modelProgress, computeBackend } = useHumanize();
   // Humanize is a plain on/off toggle. `humanizeOn` = the user's intent (engine
   // humanized). `humanizedGrid` is the grid the applied layer was computed from;
   // when the live `grid` drifts from it we're "pending" — a re-humanize is queued
@@ -45,6 +48,9 @@ function App() {
   // so toggling back on is instant when nothing changed. Off is the default.
   const [humanizeOn, setHumanizeOn] = useState(false);
   const [humanizedGrid, setHumanizedGrid] = useState(null);
+  // The applied perf layer in state (mirrors perfLayerRef) so the grid can tint
+  // humanized hits. Updated per streamed window, so the tint fills in bar by bar.
+  const [humanizedLayer, setHumanizedLayer] = useState(null);
   const idleHumanizeTimeoutRef = useRef(null);
   const lastHashRef = useRef(typeof window !== 'undefined' && window.location.hash ? window.location.hash.substring(1) : '');
   const bpmApplyTimeoutRef = useRef(null);
@@ -181,15 +187,22 @@ function App() {
   const runHumanize = useCallback((g) => {
     if (!g || g.length === 0) return;
     const bpm = bpmInputRef.current;
-    computeHumanize(g, bpm).then((layer) => {
-      if (!layer) return; // failed (phase=error) or superseded by a newer call
-      // Offsets are in seconds for `bpm`; if the tempo changed while the worker
-      // ran, rescale to the live bpm so microtiming matches playback.
+    // Apply a (partial or final) layer to the engine. Offsets are in seconds for
+    // `bpm`; if the tempo changed while the worker ran, rescale to the live bpm
+    // so microtiming matches playback.
+    const apply = (layer) => {
       const liveBpm = bpmInputRef.current;
       const applied = liveBpm === bpm ? layer : rescaleOffsets(layer, bpm, liveBpm);
       perfLayerRef.current = applied;
       perfBpmRef.current = liveBpm;
       setPerfLayer(applied);
+      setHumanizedLayer(applied); // drive the pad tint (per-window as it streams)
+    };
+    // Stream each window as it lands so the grid humanizes bar by bar, then
+    // finalize (record the grid this layer represents) on the resolved result.
+    computeHumanize(g, bpm, (partial) => { if (partial) apply(partial); }).then((layer) => {
+      if (!layer) return; // failed (phase=error) or superseded by a newer call
+      apply(layer);
       setHumanizedGrid(g); // the grid this layer now represents
     });
   }, [computeHumanize, setPerfLayer]);
@@ -232,17 +245,19 @@ function App() {
       idleHumanizeTimeoutRef.current = null;
     }
     if (!humanizePending || humanizePhase === 'computing') return undefined;
+    // WASM reacts quickly; the JS fallback waits longer (compute is ~5x slower).
+    const idleMs = computeBackend === 'wasm' ? HUMANIZE_IDLE_MS_WASM : HUMANIZE_IDLE_MS_JS;
     idleHumanizeTimeoutRef.current = setTimeout(() => {
       idleHumanizeTimeoutRef.current = null;
       runHumanize(gridRef.current);
-    }, HUMANIZE_IDLE_MS);
+    }, idleMs);
     return () => {
       if (idleHumanizeTimeoutRef.current) {
         clearTimeout(idleHumanizeTimeoutRef.current);
         idleHumanizeTimeoutRef.current = null;
       }
     };
-  }, [humanizePending, humanizePhase, grid, runHumanize]);
+  }, [humanizePending, humanizePhase, grid, runHumanize, computeBackend]);
 
   // Discard humanization entirely. Used when the user switches time signature —
   // they're writing a different beat, so carrying the old groove (or its
@@ -254,6 +269,7 @@ function App() {
     }
     setHumanizeOn(false);
     setHumanizedGrid(null);
+    setHumanizedLayer(null);
     perfLayerRef.current = null;
     perfBpmRef.current = bpmInputRef.current;
     setPerfLayer(null);
@@ -597,6 +613,7 @@ function App() {
           isPlaying={isPlaying}
           togglePlay={togglePlay}
           grid={grid}
+          humanizedMask={humanizeActive ? humanizedLayer : null}
           toggleStep={toggleStep}
           bulkUpdateStep={bulkUpdateStep}
           currentStep={currentStep}

@@ -13,6 +13,7 @@ export function InstrumentRow({
     instrument,
     rowIdx,
     gridRow,
+    humanizedRow,
     stepCount,
     stepsPerMeasure,
     grouping,
@@ -51,6 +52,7 @@ export function InstrumentRow({
                         <Pad
                             key={colIdx}
                             isActive={isActive}
+                            humanized={!!humanizedRow?.[colIdx]}
                             rowIdx={rowIdx}
                             colIdx={colIdx}
                             grouping={grouping}

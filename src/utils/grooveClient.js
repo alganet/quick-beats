@@ -22,19 +22,25 @@ const ensureWorker = () => {
         // Warmup messages are type-tagged (no request id).
         if (data.type) {
             if (data.type === 'progress') warmup?.onProgress?.(data.progress);
-            else if (data.type === 'ready') warmup?.resolve();
+            else if (data.type === 'ready') warmup?.resolve(data.backend); // 'wasm' | 'js'
             else if (data.type === 'error') {
                 warmup?.reject(new Error(data.error || 'groove warmup error'));
                 warmup = null; // let a retry re-warm
             }
             return;
         }
-        const { id, perf, error } = data;
+        const { id, perf, error, done } = data;
         const entry = pending.get(id);
         if (!entry) return;
-        pending.delete(id);
-        if (error) entry.reject(new Error(error));
-        else entry.resolve(perf);
+        if (error) {
+            pending.delete(id);
+            entry.reject(new Error(error));
+        } else if (done === false) {
+            entry.onPartial?.(perf); // streamed window; keep the entry pending
+        } else {
+            pending.delete(id);
+            entry.resolve(perf);
+        }
     };
     worker.onerror = (event) => {
         const err = new Error(event.message || 'groove worker error');
@@ -53,12 +59,14 @@ const ensureWorker = () => {
 
 /**
  * Compute a humanized performance layer for `grid` at `bpm`, off the main
- * thread. Returns a Promise resolving to the layer (or null if nothing to do).
+ * thread. Returns a Promise resolving to the final layer (or null if nothing to
+ * do). `onPartial`, if given, is called with the cumulative layer after each
+ * window so the UI can stream results (the grid fills in bar by bar).
  */
-export const computeHumanization = (grid, bpm) =>
+export const computeHumanization = (grid, bpm, onPartial) =>
     new Promise((resolve, reject) => {
         const id = ++seq;
-        pending.set(id, { resolve, reject });
+        pending.set(id, { resolve, reject, onPartial });
         ensureWorker().postMessage({ id, grid, bpm });
     });
 
@@ -69,7 +77,7 @@ export const computeHumanization = (grid, bpm) =>
  * (clearing state so a later call retries).
  *
  * @param {(progress: number) => void} [onProgress] download progress 0..1.
- * @returns {Promise<void>}
+ * @returns {Promise<'wasm'|'js'|undefined>} the compute backend the worker chose.
  */
 export const warmupWeights = (onProgress) => {
     if (warmup) {

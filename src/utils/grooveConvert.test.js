@@ -216,6 +216,22 @@ describe('grooveConvert', () => {
             expect(humanizeSpy).toHaveBeenCalledTimes(1);
             expect(perf[0]).toHaveLength(64);
         });
+
+        it('calls onWindow once per computed window with the cumulative layer', () => {
+            const grid = emptyGrid(7, 64);
+            grid[0][0] = true; // window 0
+            grid[0][32] = true; // window 1
+            const seen = [];
+            const perf = computePerfLayer({}, grid, 120, (partial) => {
+                // snapshot what's filled so far (cumulative, grows each window)
+                seen.push([partial[0][0] !== null, partial[0][32] !== null]);
+            });
+            expect(humanizeSpy).toHaveBeenCalledTimes(2);
+            expect(seen).toEqual([[true, false], [true, true]]); // window 0, then 0+1
+            // final return equals the last cumulative state
+            expect(perf[0][0]).not.toBeNull();
+            expect(perf[0][32]).not.toBeNull();
+        });
     });
 
     describe('rescaleOffsets', () => {

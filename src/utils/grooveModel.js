@@ -13,7 +13,6 @@
 export const NUM_STEPS = 32;
 export const NUM_CLASSES = 9;
 export const DEPTH = 27; // NUM_CLASSES * 3
-const Z_SIZE = 256;
 const ENC_H = 512;
 const DEC_H = 256;
 const FORGET_BIAS = 1.0;
@@ -51,27 +50,13 @@ const dense = (x, kernel, bias) => {
     return out;
 };
 
-// One step of a basic LSTM cell (matches tf.basicLSTMCell with forgetBias=1).
-// kernel is [inDim + H, 4*H], gate order [i, j, f, o]. Mutates nothing; returns
-// fresh {c, h}. `x` has length inDim; `c`/`h` have length H.
-const lstmStep = (x, c, h, kernel, bias) => {
+// Apply LSTM gate nonlinearities to a precomputed gate vector `g` ([i,j,f,o]
+// blocks of length H) given the previous cell `c`. forgetBias=1 (matches
+// tf.basicLSTMCell). Cheap (O(H)); always runs in JS regardless of backend.
+const applyGates = (g, c) => {
     const H = c.length;
-    const inDim = x.length;
-    const K = kernel.data;
-    const B = bias.data;
-    const cols = 4 * H;
-    const combinedLen = inDim + H;
     const newC = new Float32Array(H);
     const newH = new Float32Array(H);
-    // gates: g[col] = bias[col] + sum_k combined[k] * K[k*cols + col]
-    const g = new Float32Array(cols);
-    for (let col = 0; col < cols; col++) g[col] = B[col];
-    for (let k = 0; k < combinedLen; k++) {
-        const v = k < inDim ? x[k] : h[k - inDim];
-        if (v === 0) continue;
-        const base = k * cols;
-        for (let col = 0; col < cols; col++) g[col] += v * K[base + col];
-    }
     for (let k = 0; k < H; k++) {
         const i = g[k];
         const j = g[H + k];
@@ -84,30 +69,87 @@ const lstmStep = (x, c, h, kernel, bias) => {
     return { c: newC, h: newH };
 };
 
+// One step of a basic LSTM cell (matches tf.basicLSTMCell with forgetBias=1).
+// kernel is [inDim + H, 4*H], gate order [i, j, f, o]. Mutates nothing; returns
+// fresh {c, h}. `x` has length inDim; `c`/`h` have length H. Standalone JS
+// reference kept for unit tests (the model path goes through a backend).
+const lstmStep = (x, c, h, kernel, bias) => {
+    const H = c.length;
+    const inDim = x.length;
+    const K = kernel.data;
+    const B = bias.data;
+    const cols = 4 * H;
+    const combinedLen = inDim + H;
+    const g = new Float32Array(cols);
+    for (let col = 0; col < cols; col++) g[col] = B[col];
+    for (let k = 0; k < combinedLen; k++) {
+        const v = k < inDim ? x[k] : h[k - inDim];
+        if (v === 0) continue;
+        const base = k * cols;
+        for (let col = 0; col < cols; col++) g[col] += v * K[base + col];
+    }
+    return applyGates(g, c);
+};
+
+// The model's only hot primitive: affine = bias + concat(segments) . kernel.
+// `affine(segments, kernelName, biasName) -> Float32Array(outDim)`. Both `dense`
+// (one segment) and the LSTM gate matmul (segments = [...inputs, h]) reduce to
+// this. The JS backend matches `dense`/`lstmStep` exactly (same accumulation
+// order + zero-input sparsity skip); the WASM backend swaps in a SIMD kernel.
+export const jsBackend = (weights) => ({
+    kind: 'js',
+    affine: (segments, kName, bName) => {
+        const kernel = weights.get(kName);
+        const bias = weights.get(bName);
+        const outDim = kernel.shape[1];
+        const K = kernel.data;
+        const B = bias.data;
+        const out = new Float32Array(outDim);
+        for (let o = 0; o < outDim; o++) out[o] = B[o];
+        let k = 0;
+        for (const seg of segments) {
+            for (let s = 0; s < seg.length; s++, k++) {
+                const v = seg[s];
+                if (v === 0) continue;
+                const base = k * outDim;
+                for (let o = 0; o < outDim; o++) out[o] += v * K[base + o];
+            }
+        }
+        return out;
+    },
+});
+
+const resolveBackend = (weightsOrBackend) =>
+    weightsOrBackend && typeof weightsOrBackend.affine === 'function'
+        ? weightsOrBackend
+        : jsBackend(weightsOrBackend);
+
+// One LSTM step over a backend: g = affine([...xSegments, h]); then gates.
+const lstmCell = (backend, xSegments, c, h, kName, bName) =>
+    applyGates(backend.affine([...xSegments, h], kName, bName), c);
+
 /**
  * Encode a [NUM_STEPS][DEPTH] input (Float32Array rows) to the latent mean z.
+ * Accepts a weights Map or a backend (Map is wrapped with the JS backend).
  * @returns {Float32Array} z (length 256)
  */
-export const encode = (weights, input) => {
-    const fwK = weights.get(W.encFwK);
-    const fwB = weights.get(W.encFwB);
-    const bwK = weights.get(W.encBwK);
-    const bwB = weights.get(W.encBwB);
+export const encode = (weightsOrBackend, input) => {
+    const backend = resolveBackend(weightsOrBackend);
 
     let fc = new Float32Array(ENC_H);
     let fh = new Float32Array(ENC_H);
     for (let s = 0; s < NUM_STEPS; s++) {
-        ({ c: fc, h: fh } = lstmStep(input[s], fc, fh, fwK, fwB));
+        ({ c: fc, h: fh } = lstmCell(backend, [input[s]], fc, fh, W.encFwK, W.encFwB));
     }
     let bc = new Float32Array(ENC_H);
     let bh = new Float32Array(ENC_H);
     for (let s = NUM_STEPS - 1; s >= 0; s--) {
-        ({ c: bc, h: bh } = lstmStep(input[s], bc, bh, bwK, bwB));
+        ({ c: bc, h: bh } = lstmCell(backend, [input[s]], bc, bh, W.encBwK, W.encBwB));
     }
     const finalState = new Float32Array(2 * ENC_H);
     finalState.set(fh, 0);
     finalState.set(bh, ENC_H);
-    return dense(finalState, weights.get(W.muK), weights.get(W.muB));
+    return backend.affine([finalState], W.muK, W.muB);
 };
 
 /**
@@ -115,8 +157,9 @@ export const encode = (weights, input) => {
  * sampled output: [hits(9) in {0,1}, velocities(9) in [0,1], offsets(9) in [-1,1]].
  * Deterministic (hit threshold 0.5, no temperature) for reproducible humanization.
  */
-export const decode = (weights, z) => {
-    const init = dense(z, weights.get(W.z2iK), weights.get(W.z2iB));
+export const decode = (weightsOrBackend, z) => {
+    const backend = resolveBackend(weightsOrBackend);
+    const init = backend.affine([z], W.z2iK, W.z2iB);
     for (let i = 0; i < init.length; i++) init[i] = Math.tanh(init[i]);
     // split into [c0, h0, c1, h1], each DEC_H
     let c0 = init.slice(0, DEC_H);
@@ -124,22 +167,13 @@ export const decode = (weights, z) => {
     let c1 = init.slice(2 * DEC_H, 3 * DEC_H);
     let h1 = init.slice(3 * DEC_H, 4 * DEC_H);
 
-    const dec0K = weights.get(W.dec0K);
-    const dec0B = weights.get(W.dec0B);
-    const dec1K = weights.get(W.dec1K);
-    const dec1B = weights.get(W.dec1B);
-    const outK = weights.get(W.outK);
-    const outB = weights.get(W.outB);
-
     let prev = new Float32Array(DEPTH);
     const out = [];
     for (let s = 0; s < NUM_STEPS; s++) {
-        const inp = new Float32Array(DEPTH + Z_SIZE);
-        inp.set(prev, 0);
-        inp.set(z, DEPTH);
-        ({ c: c0, h: h0 } = lstmStep(inp, c0, h0, dec0K, dec0B));
-        ({ c: c1, h: h1 } = lstmStep(h0, c1, h1, dec1K, dec1B));
-        const o = dense(h1, outK, outB);
+        // cell 0 input is the previous output concatenated with z.
+        ({ c: c0, h: h0 } = lstmCell(backend, [prev, z], c0, h0, W.dec0K, W.dec0B));
+        ({ c: c1, h: h1 } = lstmCell(backend, [h0], c1, h1, W.dec1K, W.dec1B));
+        const o = backend.affine([h1], W.outK, W.outB);
 
         const sample = new Float32Array(DEPTH);
         for (let k = 0; k < NUM_CLASSES; k++) {
@@ -153,8 +187,14 @@ export const decode = (weights, z) => {
     return out;
 };
 
-/** encode -> decode. Returns the humanized [NUM_STEPS][DEPTH] output. */
-export const humanize = (weights, input) => decode(weights, encode(weights, input));
+/**
+ * encode -> decode. Returns the humanized [NUM_STEPS][DEPTH] output. Accepts a
+ * weights Map or a prebuilt backend; resolve once and reuse for both passes.
+ */
+export const humanize = (weightsOrBackend, input) => {
+    const backend = resolveBackend(weightsOrBackend);
+    return decode(backend, encode(backend, input));
+};
 
 // Exposed for unit testing.
 export const __internals = { dense, lstmStep, sigmoid };

@@ -104,8 +104,13 @@ export const windowHasHits = (grid, start) => {
  * inside a Web Worker (see src/workers/grooveWorker.js). Windows the grid into
  * 32-step chunks, runs the model per non-empty window, and stitches the result.
  * Returns null when there is nothing to humanize.
+ *
+ * @param backend  a weights Map or a prebuilt model backend (see grooveModel).
+ * @param onWindow optional callback invoked after each window is stitched, with
+ *                 the cumulative layer — lets a consumer stream partial results
+ *                 (the grid fills in bar by bar instead of all at once).
  */
-export const computePerfLayer = (weights, grid, bpm) => {
+export const computePerfLayer = (backend, grid, bpm, onWindow) => {
     if (!grid || grid.length === 0 || !grid[0] || grid[0].length === 0) return null;
     const totalSteps = grid[0].length;
     const perf = createPerfLayer(grid.length, totalSteps);
@@ -113,8 +118,9 @@ export const computePerfLayer = (weights, grid, bpm) => {
     if (starts.length > MAX_WINDOWS) starts = starts.slice(0, MAX_WINDOWS);
     for (const start of starts) {
         if (!windowHasHits(grid, start)) continue;
-        const out = humanize(weights, gridWindowToInput(grid, start));
+        const out = humanize(backend, gridWindowToInput(grid, start));
         decoderOutputToPerf(perf, out, start, bpm, grid);
+        onWindow?.(perf);
     }
     return perf;
 };

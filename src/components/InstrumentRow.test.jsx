@@ -8,26 +8,28 @@ import { InstrumentRow } from './InstrumentRow';
 
 // Mock dependencies
 vi.mock('./Pad', () => ({
-    default: ({ 
-        rowIdx, 
-        colIdx, 
-        isActive, 
-        toggleStep, 
-        bulkUpdateStep, 
-        setMenuState, 
+    default: ({
+        rowIdx,
+        colIdx,
+        isActive,
+        humanized,
+        toggleStep,
+        bulkUpdateStep,
+        setMenuState,
         isPlaying,
         faded,
         armed,
-        ...props 
+        ...props
     }) => (
-        <button 
-            data-testid={`pad-${colIdx}`} 
+        <button
+            data-testid={`pad-${colIdx}`}
             onClick={() => toggleStep && toggleStep(rowIdx, colIdx)}
             onContextMenu={(e) => { e.preventDefault(); setMenuState && setMenuState({ x: 0, y: 0, row: rowIdx, col: colIdx }); }}
             onMouseEnter={() => bulkUpdateStep && bulkUpdateStep(rowIdx, colIdx)}
             className={isActive ? 'active' : ''}
             data-isplaying={isPlaying}
             data-faded={faded}
+            data-humanized={String(!!humanized)}
             data-armed={String(armed)}
             {...props}
         >
@@ -143,6 +145,22 @@ describe('InstrumentRow', () => {
             pendingDelete={0}
         />);
         expect(screen.getByTestId('pad-0')).toHaveAttribute('data-faded', 'true');
+    });
+
+    it('marks pads humanized from humanizedRow (non-null cells only)', () => {
+        render(<InstrumentRow
+            {...defaultProps}
+            gridRow={[true, true, true, false]}
+            humanizedRow={[{ vel: 0.5, offsetSec: 0 }, null, { vel: 0.8, offsetSec: 0.01 }, null]}
+        />);
+        expect(screen.getByTestId('pad-0')).toHaveAttribute('data-humanized', 'true');
+        expect(screen.getByTestId('pad-1')).toHaveAttribute('data-humanized', 'false'); // dropped hit
+        expect(screen.getByTestId('pad-2')).toHaveAttribute('data-humanized', 'true');
+    });
+
+    it('treats a missing humanizedRow as no humanized pads', () => {
+        render(<InstrumentRow {...defaultProps} />);
+        expect(screen.getByTestId('pad-0')).toHaveAttribute('data-humanized', 'false');
     });
 
     it('handles missing stepCount by using gridRow length', () => {

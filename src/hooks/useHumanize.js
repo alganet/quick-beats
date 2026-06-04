@@ -22,6 +22,7 @@ export function useHumanize() {
     const reqIdRef = useRef(0);
     const [modelPhase, setModelPhase] = useState('idle');
     const [modelProgress, setModelProgress] = useState(0);
+    const [computeBackend, setComputeBackend] = useState(null); // null | 'wasm' | 'js'
     const warmStartedRef = useRef(false);
 
     /**
@@ -34,9 +35,10 @@ export function useHumanize() {
         setModelProgress(0); // reset so a retry doesn't flash the prior attempt's percent
         setModelPhase('loading');
         warmupWeights((p) => setModelProgress(p))
-            .then(() => {
+            .then((backend) => {
                 setModelProgress(1);
                 setModelPhase('ready');
+                setComputeBackend(backend ?? 'js'); // which engine the worker chose
             })
             .catch(() => {
                 warmStartedRef.current = false; // allow a retry
@@ -49,14 +51,16 @@ export function useHumanize() {
      * or null if there's nothing to humanize or a newer compute superseded this
      * one (latest-wins). Never throws.
      */
-    const compute = useCallback(async (grid, bpm) => {
+    const compute = useCallback(async (grid, bpm, onPartial) => {
         if (!grid || grid.length === 0 || !grid[0] || grid[0].length === 0) {
             return null;
         }
         const id = ++reqIdRef.current;
         setPhase('computing');
         try {
-            const perf = await computeHumanization(grid, bpm);
+            const perf = await computeHumanization(grid, bpm, (partial) => {
+                if (id === reqIdRef.current) onPartial?.(partial); // drop superseded partials
+            });
             if (id !== reqIdRef.current) return null; // superseded
             setPhase('ready');
             return perf;
@@ -76,5 +80,5 @@ export function useHumanize() {
         setPhase('idle');
     }, []);
 
-    return { phase, compute, reset, warmup, modelPhase, modelProgress };
+    return { phase, compute, reset, warmup, modelPhase, modelProgress, computeBackend };
 }
