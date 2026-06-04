@@ -72,6 +72,49 @@ describe('HumanizeButton', () => {
             fireEvent.keyDown(document, { key: 'Escape' });
             expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
         });
+
+        it('does not open on hover (click/focus only; hover is loading-only)', () => {
+            const { container } = setup('unavailable');
+            fireEvent.mouseEnter(container.firstChild);
+            expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('loading (model downloading)', () => {
+        const renderLoading = (progress = 0.5) => {
+            const onClick = vi.fn();
+            const utils = render(<HumanizeButton status="loading" progress={progress} onClick={onClick} />);
+            return { onClick, ...utils };
+        };
+
+        it('is non-interactive, busy, and shows a progress ring', () => {
+            const { onClick, container } = renderLoading(0.5);
+            const btn = screen.getByRole('button');
+            expect(btn).toHaveAttribute('aria-disabled', 'true');
+            expect(btn).toHaveAttribute('aria-busy', 'true');
+            // The ring is an SVG with a progress stroke; the person icon sits inside it.
+            expect(container.querySelector('svg circle.stroke-primary')).toBeTruthy();
+            expect(useHref(container)).toBe('#icon-humanize');
+            fireEvent.click(btn);
+            expect(onClick).not.toHaveBeenCalled();
+        });
+
+        it('shows a friendly popover with the percent on click', () => {
+            renderLoading(0.42);
+            fireEvent.click(screen.getByRole('button'));
+            const tip = screen.getByRole('tooltip');
+            expect(tip).toHaveTextContent(/only happens once/i);
+            expect(tip).toHaveTextContent('42%');
+        });
+
+        it('opens the popover on hover', () => {
+            const { container } = renderLoading();
+            expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+            fireEvent.mouseEnter(container.firstChild);
+            expect(screen.getByRole('tooltip')).toBeInTheDocument();
+            fireEvent.mouseLeave(container.firstChild);
+            expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+        });
     });
 
     describe('error', () => {
