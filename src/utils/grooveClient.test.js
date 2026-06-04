@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: ISC
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { computeHumanization, __resetGrooveClient } from './grooveClient';
+import { computeHumanization, warmupWeights, __resetGrooveClient } from './grooveClient';
 
-// Minimal Worker stub: echoes back a computed perf (or an error) per message id.
+// Minimal Worker stub: echoes back a computed perf (or an error) per message id,
+// and answers a { type: 'warmup' } with a progress tick then 'ready'.
 class FakeWorker {
     constructor() {
         this.onmessage = null;
@@ -14,6 +15,18 @@ class FakeWorker {
     }
     postMessage(msg) {
         FakeWorker.lastMessage = msg;
+        if (msg.type === 'warmup') {
+            queueMicrotask(() => {
+                if (!this.onmessage) return;
+                if (FakeWorker.warmupFails) {
+                    this.onmessage({ data: { type: 'error', error: 'warmup failed' } });
+                    return;
+                }
+                this.onmessage({ data: { type: 'progress', progress: 0.5 } });
+                this.onmessage({ data: { type: 'ready' } });
+            });
+            return;
+        }
         const { id, grid } = msg;
         queueMicrotask(() => {
             if (!this.onmessage) return;
@@ -24,10 +37,12 @@ class FakeWorker {
     terminate() {}
 }
 FakeWorker.instances = [];
+FakeWorker.warmupFails = false;
 
 describe('grooveClient', () => {
     beforeEach(() => {
         FakeWorker.instances = [];
+        FakeWorker.warmupFails = false;
         vi.stubGlobal('Worker', FakeWorker);
     });
     afterEach(() => {
@@ -54,6 +69,28 @@ describe('grooveClient', () => {
 
     it('rejects when the worker reports an error', async () => {
         await expect(computeHumanization('BOOM', 120)).rejects.toThrow('worker failed');
+    });
+
+    it('warmupWeights reports progress and resolves, reusing the one worker for compute', async () => {
+        const onProgress = vi.fn();
+        await warmupWeights(onProgress);
+        expect(onProgress).toHaveBeenCalledWith(0.5);
+        await computeHumanization([[true]], 120);
+        expect(FakeWorker.instances).toHaveLength(1);
+        expect(FakeWorker.instances[0].constructor).toBe(FakeWorker);
+    });
+
+    it('warmupWeights dedupes: a second call returns the same promise', async () => {
+        const p1 = warmupWeights();
+        const p2 = warmupWeights();
+        expect(p1).toBe(p2);
+        await p1;
+        expect(FakeWorker.instances).toHaveLength(1);
+    });
+
+    it('warmupWeights rejects when the worker reports an error', async () => {
+        FakeWorker.warmupFails = true;
+        await expect(warmupWeights()).rejects.toThrow('warmup failed');
     });
 
     it('routes concurrent requests to the right promise by id', async () => {

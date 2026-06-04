@@ -6,11 +6,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTheme } from './hooks/useTheme'
 import { useAudio } from './hooks/useAudio'
 import { useHumanize } from './hooks/useHumanize'
+import { useSamplePreload } from './hooks/useSamplePreload'
 import { rescaleOffsets } from './utils/grooveConvert'
 import { HUMANIZE_STYLE } from './data/humanizeStyle'
 import Sequencer from './components/Sequencer'
 import Controls from './components/Controls'
 import Setup from './components/Setup'
+import LoadingScreen from './components/LoadingScreen'
 import ShareModal from './components/ShareModal'
 import Help from './components/Help'
 import { IconSprite, Icon } from './components/Icons'
@@ -33,8 +35,9 @@ const HUMANIZE_IDLE_MS = 5000;
 
 function App() {
   const [theme, , toggleTheme] = useTheme();
+  const { ready: assetsReady, progress: assetsProgress } = useSamplePreload();
   const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote, setPerfLayer, setHumanizeEnabled, setHumanizeOptions } = useAudio();
-  const { phase: humanizePhase, compute: computeHumanize, reset: resetHumanizePhase } = useHumanize();
+  const { phase: humanizePhase, compute: computeHumanize, reset: resetHumanizePhase, warmup: warmupModel, modelPhase, modelProgress } = useHumanize();
   // Humanize is a plain on/off toggle. `humanizeOn` = the user's intent (engine
   // humanized). `humanizedGrid` is the grid the applied layer was computed from;
   // when the live `grid` drifts from it we're "pending" — a re-humanize is queued
@@ -84,6 +87,14 @@ function App() {
 
   // GrooVAE humanize only supports 16th-note grids (4/4, 3/4, 5/4).
   const humanizeSupported = !!timeSignature && timeSignature.stepsPerBeat === 4;
+
+  // Start downloading the 8MB model once the grid is shown (and only for
+  // supported signatures) so the first Humanize click is fast, not a download.
+  // Gated on `assetsReady` so on a shared-link load the model doesn't steal
+  // bandwidth from the drum-sample prefetch that gates the UX.
+  useEffect(() => {
+    if (assetsReady && isSetup && humanizeSupported) warmupModel();
+  }, [assetsReady, isSetup, humanizeSupported, warmupModel]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -190,6 +201,11 @@ function App() {
   // While on, edits auto re-humanize after a 5s idle (see the effect below).
   const humanizeAction = useCallback(() => {
     if (!humanizeSupported) return;
+    if (modelPhase === 'error') { // retry the model download from the error popover
+      warmupModel();
+      return;
+    }
+    if (modelPhase !== 'ready') return; // weights still downloading — ignore clicks
     if (humanizePhase === 'error') { // retry from the error popover
       runHumanize(gridRef.current);
       return;
@@ -203,7 +219,7 @@ function App() {
     setHumanizeOn(true);
     // Reuse a remembered layer that still matches the grid; otherwise compute now.
     if (!(perfLayerRef.current && humanizedGrid === g)) runHumanize(g);
-  }, [humanizeSupported, humanizePhase, humanizeOn, humanizedGrid, runHumanize]);
+  }, [humanizeSupported, modelPhase, warmupModel, humanizePhase, humanizeOn, humanizedGrid, runHumanize]);
 
   // While on, re-humanize once the grid has been idle for HUMANIZE_IDLE_MS.
   // Resetting the timer on every grid change debounces rapid edits into a single
@@ -391,17 +407,22 @@ function App() {
   //               re-humanize) -> spinner
   //   pending   : on, grid drifted, waiting on the idle timer to fire -> "!"
   //   on        : humanized and up to date
+  //   loading   : the model (weights.bin) is still downloading -> progress ring
   const humanizeStatus = !humanizeSupported
     ? 'unavailable'
-    : humanizePhase === 'error'
+    : modelPhase === 'error'
       ? 'error'
-      : !humanizeOn
-        ? 'off'
-        : humanizePhase === 'computing'
-          ? 'computing'
-          : humanizePending
-            ? 'pending'
-            : 'on';
+      : modelPhase !== 'ready'
+        ? 'loading'
+        : humanizePhase === 'error'
+          ? 'error'
+          : !humanizeOn
+            ? 'off'
+            : humanizePhase === 'computing'
+              ? 'computing'
+              : humanizePending
+                ? 'pending'
+                : 'on';
 
   const handlePreview = (sig) => {
     setPreviewSig(sig);
@@ -458,6 +479,13 @@ function App() {
   const removeMeasure = (measureIndex) => {
     setGrid(prevGrid => calculateGridWithRemovedMeasure(prevGrid, measureIndex, timeSignature));
   };
+
+  // Gate all UX until the drum samples are warm in the HTTP cache so the first
+  // Play/preview gesture decodes from cache instead of stalling on the network.
+  // Covers the hash-restore path (isSetup starts true) too.
+  if (!assetsReady) {
+    return <LoadingScreen progress={assetsProgress} />;
+  }
 
   if (!isSetup) {
     return (
@@ -560,6 +588,7 @@ function App() {
             zoom={zoom}
             setZoom={setZoom}
             humanizeStatus={humanizeStatus}
+            humanizeProgress={modelProgress}
             onHumanize={humanizeAction}
           />
         </div>

@@ -6,8 +6,10 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const computeHumanization = vi.fn();
+const warmupWeights = vi.fn();
 vi.mock('../utils/grooveClient', () => ({
     computeHumanization: (...a) => computeHumanization(...a),
+    warmupWeights: (...a) => warmupWeights(...a),
 }));
 
 import { useHumanize } from './useHumanize';
@@ -19,11 +21,67 @@ describe('useHumanize', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         computeHumanization.mockResolvedValue(fakePerf());
+        warmupWeights.mockResolvedValue(undefined);
     });
 
     it('starts idle', () => {
         const { result } = renderHook(() => useHumanize());
         expect(result.current.phase).toBe('idle');
+    });
+
+    it('starts with the model unloaded (modelPhase idle)', () => {
+        const { result } = renderHook(() => useHumanize());
+        expect(result.current.modelPhase).toBe('idle');
+        expect(result.current.modelProgress).toBe(0);
+    });
+
+    it('warmup walks loading -> ready, forwarding progress', async () => {
+        let reportProgress;
+        warmupWeights.mockImplementation((onProgress) => {
+            reportProgress = onProgress;
+            return new Promise((resolve) => { warmupWeights.resolve = resolve; });
+        });
+        const { result } = renderHook(() => useHumanize());
+
+        act(() => { result.current.warmup(); });
+        expect(result.current.modelPhase).toBe('loading');
+
+        act(() => { reportProgress(0.4); });
+        expect(result.current.modelProgress).toBeCloseTo(0.4);
+
+        await act(async () => { warmupWeights.resolve(); });
+        expect(result.current.modelPhase).toBe('ready');
+        expect(result.current.modelProgress).toBe(1);
+    });
+
+    it('warmup goes to error when the download rejects', async () => {
+        warmupWeights.mockRejectedValue(new Error('offline'));
+        const { result } = renderHook(() => useHumanize());
+        await act(async () => { result.current.warmup(); });
+        await waitFor(() => expect(result.current.modelPhase).toBe('error'));
+    });
+
+    it('retry after an error resets progress so the prior percent does not flash', async () => {
+        let rejectFn;
+        let reportProgress;
+        warmupWeights.mockImplementationOnce((onProgress) => {
+            reportProgress = onProgress;
+            return new Promise((_, rej) => { rejectFn = rej; });
+        });
+        const { result } = renderHook(() => useHumanize());
+
+        act(() => { result.current.warmup(); });
+        act(() => { reportProgress(0.7); });
+        expect(result.current.modelProgress).toBeCloseTo(0.7);
+
+        await act(async () => { rejectFn(new Error('offline')); });
+        expect(result.current.modelPhase).toBe('error');
+
+        // Retry: the ring snaps back to 0 immediately rather than showing 70%.
+        warmupWeights.mockImplementationOnce(() => new Promise(() => {})); // stays loading
+        act(() => { result.current.warmup(); });
+        expect(result.current.modelProgress).toBe(0);
+        expect(result.current.modelPhase).toBe('loading');
     });
 
     it('compute returns null for an empty grid without invoking the worker', async () => {

@@ -105,6 +105,37 @@ describe('grooveWeights', () => {
             expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
         });
 
+        it('streams weights.bin with progress when the body is readable', async () => {
+            const meta = { weights: { 'a/kernel': { offset: 0, shape: [2, 2] } } };
+            const vals = [0.5, -0.5, 1, -1];
+            const u16 = Uint16Array.from(vals.map(f32ToF16));
+            const bytes = new Uint8Array(u16.buffer);
+            const mid = Math.floor(bytes.length / 2);
+            const chunks = [bytes.slice(0, mid), bytes.slice(mid)];
+            let i = 0;
+            const reader = {
+                read: () => i < chunks.length
+                    ? Promise.resolve({ done: false, value: chunks[i++] })
+                    : Promise.resolve({ done: true, value: undefined }),
+            };
+            const fetchMock = vi.fn((url) =>
+                url.endsWith('meta.json')
+                    ? Promise.resolve({ ok: true, json: () => Promise.resolve(meta) })
+                    : Promise.resolve({
+                        ok: true,
+                        headers: { get: () => String(bytes.length) },
+                        body: { getReader: () => reader },
+                    }),
+            );
+            vi.stubGlobal('fetch', fetchMock);
+
+            const onProgress = vi.fn();
+            const weights = await loadWeights('/base/', onProgress);
+            expect(Array.from(weights.get('a/kernel').data).map((v) => Number(v.toFixed(2)))).toEqual([0.5, -0.5, 1, -1]);
+            expect(onProgress).toHaveBeenCalled();
+            expect(onProgress).toHaveBeenLastCalledWith(1);
+        });
+
         it('throws on HTTP error', async () => {
             vi.stubGlobal(
                 'fetch',

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { useCallback, useRef, useState } from 'react';
-import { computeHumanization } from '../utils/grooveClient';
+import { computeHumanization, warmupWeights } from '../utils/grooveClient';
 
 /**
  * GrooVAE model lifecycle: a `compute` that runs the model in a Web Worker
@@ -12,10 +12,37 @@ import { computeHumanization } from '../utils/grooveClient';
  * (it's triggered only by the user pressing the Humanize button).
  *
  * phase: 'idle' | 'computing' | 'ready' | 'error'
+ *
+ * Separately tracks the one-time model (weights.bin) download so the App can
+ * start it as soon as the grid is shown and reflect progress on the button:
+ * modelPhase: 'idle' | 'loading' | 'ready' | 'error', modelProgress: 0..1.
  */
 export function useHumanize() {
     const [phase, setPhase] = useState('idle');
     const reqIdRef = useRef(0);
+    const [modelPhase, setModelPhase] = useState('idle');
+    const [modelProgress, setModelProgress] = useState(0);
+    const warmStartedRef = useRef(false);
+
+    /**
+     * Begin (or retry) the background weight download. Idempotent while loading
+     * or ready; a previous error resets so this re-attempts.
+     */
+    const warmup = useCallback(() => {
+        if (warmStartedRef.current) return;
+        warmStartedRef.current = true;
+        setModelProgress(0); // reset so a retry doesn't flash the prior attempt's percent
+        setModelPhase('loading');
+        warmupWeights((p) => setModelProgress(p))
+            .then(() => {
+                setModelProgress(1);
+                setModelPhase('ready');
+            })
+            .catch(() => {
+                warmStartedRef.current = false; // allow a retry
+                setModelPhase('error');
+            });
+    }, []);
 
     /**
      * Compute the performance layer off the main thread. Resolves to the layer,
@@ -49,5 +76,5 @@ export function useHumanize() {
         setPhase('idle');
     }, []);
 
-    return { phase, compute, reset };
+    return { phase, compute, reset, warmup, modelPhase, modelProgress };
 }

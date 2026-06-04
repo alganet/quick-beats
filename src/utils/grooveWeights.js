@@ -35,14 +35,46 @@ const prod = (shape) => shape.reduce((a, b) => a * b, 1);
 
 let cache = null;
 
+// Read a fetch Response body to an ArrayBuffer, reporting download progress
+// (0..1) against Content-Length when the body is a readable stream. Falls back
+// to arrayBuffer() when there's no stream (e.g. test mocks) — no progress then.
+const readWithProgress = async (res, onProgress) => {
+    const total = Number(res.headers?.get?.('Content-Length')) || 0;
+    if (!onProgress || !res.body?.getReader) {
+        return res.arrayBuffer();
+    }
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total) onProgress(received / total);
+    }
+    const out = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+        out.set(chunk, offset);
+        offset += chunk.length;
+    }
+    onProgress(1);
+    return out.buffer;
+};
+
 /**
  * Fetch + dequantize the GrooVAE weights once. Returns a Map keyed by the
  * tfjs variable name -> { data: Float32Array, shape: number[] }.
  *
  * @param {string} [baseUrl] Base URL for the asset (defaults to Vite's BASE_URL).
+ * @param {(progress: number) => void} [onProgress] download progress 0..1 for weights.bin.
  */
-export const loadWeights = async (baseUrl) => {
-    if (cache) return cache;
+export const loadWeights = async (baseUrl, onProgress) => {
+    if (cache) {
+        onProgress?.(1);
+        return cache;
+    }
     const base = baseUrl ?? (import.meta.env?.BASE_URL ?? '/');
     const root = base.endsWith('/') ? base : base + '/';
 
@@ -53,7 +85,7 @@ export const loadWeights = async (baseUrl) => {
         }),
         fetch(root + MODEL_PATH + 'weights.bin').then((r) => {
             if (!r.ok) throw new Error(`groove weights ${r.status}`);
-            return r.arrayBuffer();
+            return readWithProgress(r, onProgress);
         }),
     ]);
 

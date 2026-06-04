@@ -11,7 +11,7 @@ const ACTION_DELAY_MS = 200;
 
 export default function Controls({
     isPlaying, togglePlay, bpm, setBpm, autoScroll, setAutoScroll, canScroll, zoom, setZoom,
-    humanizeStatus, onHumanize,
+    humanizeStatus, humanizeProgress, onHumanize,
 }) {
     const zoomToggleTimeoutRef = useRef(null);
     const autoScrollToggleTimeoutRef = useRef(null);
@@ -101,7 +101,7 @@ export default function Controls({
             <div className="flex-1 flex items-center justify-end gap-3 ml-0">
 
                 {/* Humanize toggle (off / on / pending) */}
-                <HumanizeButton status={humanizeStatus} onClick={onHumanize} />
+                <HumanizeButton status={humanizeStatus} progress={humanizeProgress} onClick={onHumanize} />
 
                 {/* Zoom Toggle */}
                 <button

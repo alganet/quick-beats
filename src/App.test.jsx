@@ -34,10 +34,19 @@ const mockUseHumanize = {
     phase: 'idle',
     compute: vi.fn().mockResolvedValue(null),
     reset: vi.fn(),
+    warmup: vi.fn(),
+    modelPhase: 'ready',
+    modelProgress: 1,
 };
 
 vi.mock('./hooks/useHumanize', () => ({
     useHumanize: () => mockUseHumanize,
+}));
+
+// Samples are pre-warmed in tests so the app renders past the loading gate.
+const mockUseSamplePreload = { ready: true, progress: 1 };
+vi.mock('./hooks/useSamplePreload', () => ({
+    useSamplePreload: () => mockUseSamplePreload,
 }));
 
 // Mock child components to verify props and interactions
@@ -109,6 +118,11 @@ describe('App', () => {
         mockUseHumanize.phase = 'idle';
         mockUseHumanize.compute.mockResolvedValue(null);
         mockUseHumanize.reset.mockClear();
+        mockUseHumanize.warmup.mockClear();
+        mockUseHumanize.modelPhase = 'ready';
+        mockUseHumanize.modelProgress = 1;
+        mockUseSamplePreload.ready = true;
+        mockUseSamplePreload.progress = 1;
         window.location.hash = '';
     });
 
@@ -274,6 +288,52 @@ describe('App', () => {
 
         expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'unavailable');
         fireEvent.keyDown(window, { key: 'h' });
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+    });
+
+    it('warms up the model on entering the sequencer for a supported signature', () => {
+        renderWith44();
+        expect(mockUseHumanize.warmup).toHaveBeenCalled();
+    });
+
+    it('does not warm up the model until the drum samples are ready', () => {
+        mockUseSamplePreload.ready = false;
+        mockUseSamplePreload.progress = 0.3;
+        renderWith44();
+        // The loading screen gates the UX and the 8MB model waits its turn.
+        expect(screen.getByRole('status')).toHaveAttribute('aria-label', expect.stringMatching(/loading sounds/i));
+        expect(screen.queryByTestId('mock-sequencer')).not.toBeInTheDocument();
+        expect(mockUseHumanize.warmup).not.toHaveBeenCalled();
+    });
+
+    it('does not warm up the model for an unsupported signature', () => {
+        const sig = COMMON_SIGNATURES.find((s) => s.name === '6/8');
+        const steps = sig.beats * sig.stepsPerBeat;
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: steps }, () => false));
+        window.location.hash = `#120|6/8|black-pearl|${encodeGrid(grid)}|v1`;
+        render(<App />);
+        expect(mockUseHumanize.warmup).not.toHaveBeenCalled();
+    });
+
+    it('shows "loading" and ignores clicks while the model is downloading', async () => {
+        mockUseHumanize.modelPhase = 'loading';
+        mockUseHumanize.modelProgress = 0.5;
+        renderWith44();
+        const btn = screen.getByTestId('humanize-btn');
+        expect(btn).toHaveAttribute('data-status', 'loading');
+        await act(async () => { fireEvent.click(btn); });
+        expect(mockUseHumanize.compute).not.toHaveBeenCalled();
+        expect(screen.getByTestId('humanize-btn')).toHaveAttribute('data-status', 'loading');
+    });
+
+    it('retries the model download from the error state on click', async () => {
+        mockUseHumanize.modelPhase = 'error';
+        renderWith44();
+        const btn = screen.getByTestId('humanize-btn');
+        expect(btn).toHaveAttribute('data-status', 'error');
+        mockUseHumanize.warmup.mockClear();
+        await act(async () => { fireEvent.click(btn); });
+        expect(mockUseHumanize.warmup).toHaveBeenCalled();
         expect(mockUseHumanize.compute).not.toHaveBeenCalled();
     });
 

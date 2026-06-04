@@ -10,6 +10,27 @@ const POPOVER_COPY = {
     error: "Couldn't load the humanize model. Check your connection, then retry.",
 };
 
+// Small ring that fills clockwise with `progress` (0..1), wrapping the humanize
+// icon while the model downloads. r=15 in a 36-box -> circumference ~94.2.
+const RING_CIRC = 2 * Math.PI * 15;
+
+function ProgressRing({ progress }) {
+    const p = Math.max(0, Math.min(1, progress));
+    return (
+        <span className="relative w-6 h-6 grid place-items-center">
+            <svg viewBox="0 0 36 36" className="absolute inset-0 w-full h-full -rotate-90">
+                <circle cx="18" cy="18" r="15" fill="none" strokeWidth="3" className="stroke-surface-3" />
+                <circle
+                    cx="18" cy="18" r="15" fill="none" strokeWidth="3" strokeLinecap="round"
+                    className="stroke-primary transition-[stroke-dasharray] duration-200 ease-out"
+                    strokeDasharray={`${p * RING_CIRC} ${RING_CIRC}`}
+                />
+            </svg>
+            <Icon id="humanize" className="w-3 h-3 text-fg-muted" />
+        </span>
+    );
+}
+
 const TITLES = {
     off: "Humanize the beat",
     on: "Humanized — click to turn off",
@@ -27,17 +48,20 @@ const TITLES = {
  * unavailable (incompatible time signature).
  *
  * props:
- *   status  - 'off' | 'on' | 'pending' | 'computing' | 'error' | 'unavailable'
- *   onClick - toggle on/off (or retry from the error popover)
+ *   status   - 'off' | 'on' | 'pending' | 'computing' | 'error' | 'unavailable' | 'loading'
+ *   progress - 0..1 model-download progress (only used by 'loading')
+ *   onClick  - toggle on/off (or retry from the error popover)
  */
-export default function HumanizeButton({ status, onClick }) {
+export default function HumanizeButton({ status, progress = 0, onClick }) {
     const [popoverOpen, setPopoverOpen] = useState(false);
     const wrapperRef = useRef(null);
 
-    const blocked = status === "unavailable" || status === "error";
+    const loading = status === "loading";
+    const blocked = status === "unavailable" || status === "error" || loading;
     const active = status === "on" || status === "pending" || status === "computing";
     const computing = status === "computing";
     const pending = status === "pending";
+    const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
 
     useEffect(() => {
         if (!popoverOpen) return undefined;
@@ -54,18 +78,34 @@ export default function HumanizeButton({ status, onClick }) {
     }, [popoverOpen]);
 
     if (blocked) {
+        const popoverText = loading
+            ? `Getting the humanize model ready — this only happens once. ${pct}%`
+            : POPOVER_COPY[status];
+        const ariaLabel = loading
+            ? `Humanize model loading, ${pct} percent`
+            : "Humanization unavailable. Show details.";
         return (
-            <div className="relative flex-none" ref={wrapperRef}>
+            <div
+                className="relative flex-none"
+                ref={wrapperRef}
+                // Hover-to-open only for the loading popover (per the spec); the
+                // unavailable/error popovers stay click/focus-only as before.
+                onMouseEnter={loading ? () => setPopoverOpen(true) : undefined}
+                onMouseLeave={loading ? () => setPopoverOpen(false) : undefined}
+            >
                 <button
                     type="button"
                     onClick={() => setPopoverOpen((o) => !o)}
                     onFocus={() => setPopoverOpen(true)}
                     className="w-8 h-8 flex items-center rounded-sm justify-center bg-surface-5"
                     aria-disabled="true"
-                    aria-label="Humanization unavailable. Show details."
+                    aria-busy={loading || undefined}
+                    aria-label={ariaLabel}
                     aria-describedby={popoverOpen ? "humanize-popover" : undefined}
                 >
-                    <Icon id="humanize" className="w-4 h-4 text-fg-muted opacity-30" />
+                    {loading
+                        ? <ProgressRing progress={progress} />
+                        : <Icon id="humanize" className="w-4 h-4 text-fg-muted opacity-30" />}
                 </button>
                 {popoverOpen && (
                     <div
@@ -74,7 +114,7 @@ export default function HumanizeButton({ status, onClick }) {
                         className="absolute top-full right-0 mt-2 w-56 z-[100] bg-surface-3 border border-border-default rounded-sm p-3 text-xs text-fg-secondary shadow-lg animate-in fade-in duration-150"
                     >
                         <div className="absolute -top-1 right-3 w-2 h-2 bg-surface-3 border-l border-t border-border-default rotate-45" />
-                        <p>{POPOVER_COPY[status]}</p>
+                        <p>{popoverText}</p>
                         {status === "error" && (
                             <button
                                 onClick={() => { setPopoverOpen(false); onClick(); }}
