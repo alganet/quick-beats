@@ -55,7 +55,10 @@ self.onmessage = async (e) => {
 
     const { id, grid, bpm } = msg;
     try {
-        const backend = await buildBackend();
+        // Report download progress even on a compute-triggered cold build (no
+        // prior warmup): it doubles as a liveness signal so the client doesn't
+        // mistake a slow-but-honest weight load for a stall.
+        const backend = await buildBackend((progress) => self.postMessage({ type: 'progress', progress }));
         // Stream each window's cumulative layer so multi-bar beats update as
         // they compute; the final message carries done:true.
         const perf = computePerfLayer(backend, grid, bpm, (partial) =>

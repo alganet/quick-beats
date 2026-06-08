@@ -64,8 +64,13 @@ export function useHumanize() {
             if (id !== reqIdRef.current) return null; // superseded
             setPhase('ready');
             return perf;
-        } catch {
-            if (id === reqIdRef.current) setPhase('error');
+        } catch (err) {
+            // Superseded computes can reject after the user moved on — ignore
+            // those; only surface (and log) the error for the live request.
+            if (id === reqIdRef.current) {
+                console.warn('[humanize] compute failed', err);
+                setPhase('error');
+            }
             return null;
         }
     }, []);
