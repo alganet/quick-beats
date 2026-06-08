@@ -41,7 +41,7 @@ export const calculateBulkUpdate = (grid, row, col, mode, timeSignature) => {
                 const currentStepInMeasure = cIdx % stepsPerMeasure;
                 const currentStepPosInPulse = currentStepInMeasure % pulseLength;
 
-                if (currentStepPosInPulse === posInPulse) {
+                if (cIdx >= col && currentStepPosInPulse === posInPulse) {
                     const pulseIdxAcrossAll = Math.floor(cIdx / pulseLength);
                     if (mode === 'repeat') return true;
                     if (mode === 'clear') return false;

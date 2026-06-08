@@ -80,6 +80,26 @@ describe('gridHelpers', () => {
             expect(newGrid[0][0]).toBe(true);
         });
 
+        it('should only fill forward from the pressed step (repeat)', () => {
+            // Long-press step 8: should fill 8, 12 but leave earlier matches (0, 4) untouched.
+            const grid = [Array(16).fill(false)];
+            const newGrid = calculateBulkUpdate(grid, 0, 8, 'repeat', sig);
+            expect(newGrid[0][8]).toBe(true);
+            expect(newGrid[0][12]).toBe(true);
+            expect(newGrid[0][0]).toBe(false); // Backward steps unchanged
+            expect(newGrid[0][4]).toBe(false);
+        });
+
+        it('should only clear forward from the pressed step', () => {
+            // Long-press step 8 on a full row: clears 8, 12 but leaves earlier matches (0, 4) set.
+            const grid = [Array(16).fill(true)];
+            const newGrid = calculateBulkUpdate(grid, 0, 8, 'clear', sig);
+            expect(newGrid[0][8]).toBe(false);
+            expect(newGrid[0][12]).toBe(false);
+            expect(newGrid[0][0]).toBe(true); // Backward steps unchanged
+            expect(newGrid[0][4]).toBe(true);
+        });
+
         it('should handle alternate', () => {
             const grid = [Array(16).fill(false)];
             const newGrid = calculateBulkUpdate(grid, 0, 0, 'alternate', sig);
