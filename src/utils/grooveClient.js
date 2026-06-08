@@ -13,6 +13,53 @@ const pending = new Map();
 // the worker ({ type: 'progress' | 'ready' | 'error' }) drive it.
 let warmup = null;
 
+// If a request neither finishes nor errors within this window — measured from
+// its last sign of life (sent, or a streamed window received) — treat it as
+// stalled: drop the entry and reject so its Promise can't hang forever. The
+// rejection flows to the caller (useHumanize -> phase='error' -> Retry).
+const REQUEST_TIMEOUT_MS = 30000;
+
+const clearEntryTimer = (entry) => {
+    if (entry && entry.timer !== null) {
+        clearTimeout(entry.timer);
+        entry.timer = null;
+    }
+};
+
+// (Re)arm the stall timeout for a pending request. Called when the request is
+// sent and reset on each streamed partial, so it measures silence, not total
+// compute time.
+const armTimeout = (id) => {
+    const entry = pending.get(id);
+    if (!entry) return;
+    clearEntryTimer(entry);
+    entry.timer = setTimeout(() => {
+        pending.delete(id);
+        entry.reject(new Error('groove worker timed out'));
+    }, REQUEST_TIMEOUT_MS);
+};
+
+// Same stall protection for the one-shot warmup: a silent stall during the
+// multi-MB weight download would otherwise hang its Promise forever, leaving
+// the UI stuck on the loading ring with no way to retry. Reset on every
+// progress tick so an honestly-downloading worker is never killed.
+const clearWarmupTimer = () => {
+    if (warmup && warmup.timer !== null) {
+        clearTimeout(warmup.timer);
+        warmup.timer = null;
+    }
+};
+
+const armWarmupTimeout = () => {
+    if (!warmup) return;
+    clearWarmupTimer();
+    warmup.timer = setTimeout(() => {
+        const stalled = warmup;
+        warmup = null; // let a retry re-warm
+        stalled.reject(new Error('groove warmup timed out'));
+    }, REQUEST_TIMEOUT_MS);
+};
+
 const ensureWorker = () => {
     if (worker) return worker;
     worker = new Worker(new URL('../workers/grooveWorker.js', import.meta.url), {
@@ -21,9 +68,19 @@ const ensureWorker = () => {
     worker.onmessage = ({ data }) => {
         // Warmup messages are type-tagged (no request id).
         if (data.type) {
-            if (data.type === 'progress') warmup?.onProgress?.(data.progress);
-            else if (data.type === 'ready') warmup?.resolve(data.backend); // 'wasm' | 'js'
-            else if (data.type === 'error') {
+            if (data.type === 'progress') {
+                warmup?.onProgress?.(data.progress);
+                // A progress tick proves the worker is alive and downloading, so
+                // reset the stall clocks: the warmup's own, plus any compute that
+                // is blocked awaiting the same backend build (no partials stream
+                // until the weights finish loading).
+                armWarmupTimeout();
+                pending.forEach((_entry, pid) => armTimeout(pid));
+            } else if (data.type === 'ready') {
+                clearWarmupTimer();
+                warmup?.resolve(data.backend); // 'wasm' | 'js'
+            } else if (data.type === 'error') {
+                clearWarmupTimer();
                 warmup?.reject(new Error(data.error || 'groove warmup error'));
                 warmup = null; // let a retry re-warm
             }
@@ -33,19 +90,23 @@ const ensureWorker = () => {
         const entry = pending.get(id);
         if (!entry) return;
         if (error) {
+            clearEntryTimer(entry);
             pending.delete(id);
             entry.reject(new Error(error));
         } else if (done === false) {
             entry.onPartial?.(perf); // streamed window; keep the entry pending
+            armTimeout(id); // a window landed — reset the stall clock
         } else {
+            clearEntryTimer(entry);
             pending.delete(id);
             entry.resolve(perf);
         }
     };
     worker.onerror = (event) => {
         const err = new Error(event.message || 'groove worker error');
-        pending.forEach((entry) => entry.reject(err));
+        pending.forEach((entry) => { clearEntryTimer(entry); entry.reject(err); });
         pending.clear();
+        clearWarmupTimer();
         warmup?.reject(err);
         warmup = null;
         // A worker-level failure (e.g. a module that won't load) leaves the worker
@@ -66,8 +127,9 @@ const ensureWorker = () => {
 export const computeHumanization = (grid, bpm, onPartial) =>
     new Promise((resolve, reject) => {
         const id = ++seq;
-        pending.set(id, { resolve, reject, onPartial });
+        pending.set(id, { resolve, reject, onPartial, timer: null });
         ensureWorker().postMessage({ id, grid, bpm });
+        armTimeout(id);
     });
 
 /**
@@ -87,8 +149,9 @@ export const warmupWeights = (onProgress) => {
     let resolve;
     let reject;
     const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-    warmup = { promise, resolve, reject, onProgress };
+    warmup = { promise, resolve, reject, onProgress, timer: null };
     ensureWorker().postMessage({ type: 'warmup' });
+    armWarmupTimeout();
     return promise;
 };
 
@@ -98,7 +161,9 @@ export const __resetGrooveClient = () => {
         try { worker.terminate(); } catch { /* ignore */ }
     }
     worker = null;
+    pending.forEach((entry) => clearEntryTimer(entry));
     pending.clear();
+    clearWarmupTimer();
     warmup = null;
     seq = 0;
 };

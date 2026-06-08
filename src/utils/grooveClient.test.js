@@ -16,6 +16,7 @@ class FakeWorker {
     postMessage(msg) {
         FakeWorker.lastMessage = msg;
         if (msg.type === 'warmup') {
+            if (FakeWorker.warmupHangs) return; // never responds — stalled download
             queueMicrotask(() => {
                 if (!this.onmessage) return;
                 if (FakeWorker.warmupFails) {
@@ -28,6 +29,14 @@ class FakeWorker {
             return;
         }
         const { id, grid } = msg;
+        if (grid === 'HANG') return; // never responds — simulates a stalled worker
+        if (grid === 'SLOWBUILD') {
+            // A slow-but-honest cold build: emit a liveness progress at 20s, then
+            // finish at 40s. Neither gap exceeds the 30s stall window.
+            setTimeout(() => this.onmessage?.({ data: { type: 'progress', progress: 0.3 } }), 20000);
+            setTimeout(() => this.onmessage?.({ data: { id, perf: [['ok']], done: true } }), 40000);
+            return;
+        }
         queueMicrotask(() => {
             if (!this.onmessage) return;
             if (grid === 'BOOM') this.onmessage({ data: { id, error: 'worker failed' } });
@@ -42,11 +51,13 @@ class FakeWorker {
 }
 FakeWorker.instances = [];
 FakeWorker.warmupFails = false;
+FakeWorker.warmupHangs = false;
 
 describe('grooveClient', () => {
     beforeEach(() => {
         FakeWorker.instances = [];
         FakeWorker.warmupFails = false;
+        FakeWorker.warmupHangs = false;
         vi.stubGlobal('Worker', FakeWorker);
     });
     afterEach(() => {
@@ -103,6 +114,46 @@ describe('grooveClient', () => {
     it('warmupWeights rejects when the worker reports an error', async () => {
         FakeWorker.warmupFails = true;
         await expect(warmupWeights()).rejects.toThrow('warmup failed');
+    });
+
+    it('rejects a stalled request after the timeout and drops it', async () => {
+        vi.useFakeTimers();
+        try {
+            const p = computeHumanization('HANG', 120);
+            p.catch(() => {}); // pre-attach so the advance doesn't trip unhandled-rejection
+            await vi.advanceTimersByTimeAsync(30000);
+            await expect(p).rejects.toThrow(/timed out/i);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('rejects warmup after the timeout when the worker goes silent, then allows a retry', async () => {
+        FakeWorker.warmupHangs = true;
+        vi.useFakeTimers();
+        try {
+            const p = warmupWeights();
+            p.catch(() => {}); // pre-attach so the advance doesn't trip unhandled-rejection
+            await vi.advanceTimersByTimeAsync(30000);
+            await expect(p).rejects.toThrow(/warmup timed out/i);
+        } finally {
+            vi.useRealTimers();
+        }
+        // The stalled warmup was cleared, so a fresh attempt can succeed.
+        FakeWorker.warmupHangs = false;
+        await expect(warmupWeights()).resolves.toBe('wasm');
+    });
+
+    it('resets a pending compute timer on worker progress, so a slow build does not spuriously time out', async () => {
+        vi.useFakeTimers();
+        try {
+            const p = computeHumanization('SLOWBUILD', 120);
+            await vi.advanceTimersByTimeAsync(20000); // progress tick re-arms the stall clock
+            await vi.advanceTimersByTimeAsync(20000); // done lands at t=40s; no 30s silence
+            await expect(p).resolves.toEqual([['ok']]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('routes concurrent requests to the right promise by id', async () => {
