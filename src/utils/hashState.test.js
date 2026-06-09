@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { describe, it, expect } from 'vitest';
-import { encodeGrid, decodeGrid, buildShareHash, parseShareHash } from './hashState';
+import { encodeGrid, decodeGrid, buildShareHash, parseShareHash, parseInitialHash } from './hashState';
 
 describe('hashState', () => {
     describe('encodeGrid', () => {
@@ -220,5 +220,49 @@ describe('hashState', () => {
             expect(parsed.kitId).toBe('black-pearl'); // default kit
             expect(parsed.grid).toEqual(grid);
             });
+    });
+
+    describe('parseInitialHash', () => {
+        const SIGNATURES = [
+            { name: '4/4', stepsPerBeat: 4 },
+            { name: '3/4', stepsPerBeat: 4 },
+            { name: '5/4', stepsPerBeat: 4 },
+        ];
+
+        it('returns the initial state for a valid hash with a known signature', () => {
+            const rows = 3;
+            const cols = 16;
+            const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
+            grid[0][0] = true;
+            const hash = buildShareHash({ bpm: 128, sigName: '4/4', kitId: 'black-pearl', grid });
+
+            const result = parseInitialHash(hash, rows, SIGNATURES);
+            expect(result).not.toBeNull();
+            expect(result.success).toBe(true);
+            expect(result.bpm).toBe(128);
+            expect(result.sig).toBe(SIGNATURES[0]);
+            expect(result.kitId).toBe('black-pearl');
+            expect(result.grid).toEqual(grid);
+        });
+
+        it('returns null when the signature name is unknown', () => {
+            const grid = [[true, false], [false, true]];
+            const hash = buildShareHash({ bpm: 120, sigName: '7/8', kitId: 'black-pearl', grid });
+            expect(parseInitialHash(hash, 2, SIGNATURES)).toBeNull();
+        });
+
+        it('returns null when the grid data is corrupt', () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            expect(parseInitialHash('120|4/4|black-pearl|4.!!!bad', 2, SIGNATURES)).toBeNull();
+            consoleSpy.mockRestore();
+        });
+
+        it('returns null for a hash with too few parts', () => {
+            expect(parseInitialHash('120|4/4', 2, SIGNATURES)).toBeNull();
+        });
+
+        it('returns null for an empty hash', () => {
+            expect(parseInitialHash('', 2, SIGNATURES)).toBeNull();
+        });
     });
 });

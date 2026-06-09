@@ -127,3 +127,18 @@ export const parseShareHash = (hash, expectedRows) => {
 
     return { bpm, sigName, kitId, grid };
 };
+
+// Parse a share hash into the initial app state for a fresh load: resolve the
+// signature name against the known signatures and only accept the hash if it
+// names a real one. Returns { success, bpm, sig, kitId, grid } on success, or
+// null when there's no usable hash. Kept a pure module-level function (not a
+// hook) so it can seed the useState initializers without a setup-screen flash.
+export const parseInitialHash = (hash, instrumentCount, signatures) => {
+    const parsed = parseShareHash(hash, instrumentCount);
+    if (!parsed) return null;
+
+    const sig = signatures.find(s => s.name === parsed.sigName);
+    if (!sig) return null;
+
+    return { success: true, bpm: parsed.bpm, sig, kitId: parsed.kitId, grid: parsed.grid };
+};
