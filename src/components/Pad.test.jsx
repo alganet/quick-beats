@@ -117,7 +117,8 @@ describe('Pad', () => {
             x: 125, // 100 + 50/2
             y: 200,
             row: 0,
-            col: 0
+            col: 0,
+            source: 'pointer'
         }));
     });
 
@@ -127,29 +128,53 @@ describe('Pad', () => {
         expect(pad).toHaveClass('touch-pan-x');
     });
 
-    it('applies faded styles when faded prop is true', () => {
+    it('applies faded styles to the cell when faded prop is true', () => {
         render(<Pad {...defaultProps} faded={true} />);
-        const pad = screen.getByTestId('pad');
-        expect(pad).toHaveClass('opacity-30');
-        expect(pad).toHaveClass('pointer-events-none');
+        const cell = screen.getByTestId('pad').parentElement;
+        expect(cell).toHaveClass('opacity-30');
+        expect(cell).toHaveClass('pointer-events-none');
     });
 
     it('does not apply faded styles when faded prop is false', () => {
         render(<Pad {...defaultProps} faded={false} />);
-        const pad = screen.getByTestId('pad');
-        expect(pad).not.toHaveClass('opacity-30');
-        expect(pad).not.toHaveClass('pointer-events-none');
+        const cell = screen.getByTestId('pad').parentElement;
+        expect(cell).not.toHaveClass('opacity-30');
+        expect(cell).not.toHaveClass('pointer-events-none');
     });
 
     it('applies group gap margin on last item in group', () => {
         render(<Pad {...defaultProps} colIdx={3} grouping={4} />);
-        const pad = screen.getByTestId('pad');
-        expect(pad.style.marginRight).toBe('8px');
+        const cell = screen.getByTestId('pad').parentElement;
+        expect(cell.style.marginRight).toBe('8px');
     });
 
     it('does not apply group gap margin on non-last item in group', () => {
         render(<Pad {...defaultProps} colIdx={2} grouping={4} />);
+        const cell = screen.getByTestId('pad').parentElement;
+        expect(cell.style.marginRight).toBe('');
+    });
+
+    it('exposes checkbox semantics reflecting active state', () => {
+        const { rerender } = render(<Pad {...defaultProps} isActive={false} />);
         const pad = screen.getByTestId('pad');
-        expect(pad.style.marginRight).toBe('');
+        expect(pad).toHaveAttribute('role', 'checkbox');
+        expect(pad).toHaveAttribute('aria-checked', 'false');
+        rerender(<Pad {...defaultProps} isActive={true} />);
+        expect(screen.getByTestId('pad')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('labels the pad with instrument and 1-based step, and marks humanized', () => {
+        render(<Pad {...defaultProps} instrument="Snare" colIdx={4} isActive humanized />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveAttribute('aria-label', 'Snare, step 5, humanized');
+        expect(pad).toHaveAttribute('data-row', '0');
+        expect(pad).toHaveAttribute('data-col', '4');
+    });
+
+    it('wraps the pad in a gridcell carrying the 1-based column index', () => {
+        render(<Pad {...defaultProps} colIdx={4} />);
+        const cell = screen.getByTestId('pad').parentElement;
+        expect(cell).toHaveAttribute('role', 'gridcell');
+        expect(cell).toHaveAttribute('aria-colindex', '5');
     });
 });

@@ -522,6 +522,8 @@ function App() {
   return (
     <div className="bg-surface-1 h-screen flex flex-col text-fg overflow-hidden w-fit max-w-screen min-w-[360px]">
       <IconSprite />
+      {/* Screen-reader announcement of transport state (visually hidden). */}
+      <div className="sr-only" role="status" aria-live="polite">{isPlaying ? 'Playing' : 'Paused'}</div>
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="@container flex-none flex items-center justify-between px-2 py-1 md:px-6 md:py-3">
           <div className="flex items-center gap-4">

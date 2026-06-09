@@ -81,6 +81,14 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                                 <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">?</div>
                                 <div>Show this help</div>
                             </div>
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Arrows</div>
+                                <div>Move between steps</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Enter</div>
+                                <div>Toggle focused step</div>
+                            </div>
                         </div>
                     </HelpSection>
                 )}

@@ -5,7 +5,7 @@
 import { memo, useRef, useCallback } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
 
-export const Pad = ({ isActive, humanized, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded }) => {
+export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded, isFocused, onFocusCell }) => {
     const padRef = useRef(null);
 
     const onLongPress = useCallback(() => {
@@ -16,7 +16,8 @@ export const Pad = ({ isActive, humanized, rowIdx, colIdx, grouping, config, tog
             y: rect.top,
             row: rowIdx,
             col: colIdx,
-            activeOption: null
+            activeOption: null,
+            source: 'pointer'
         });
     }, [rowIdx, colIdx, setMenuState]);
 
@@ -26,22 +27,38 @@ export const Pad = ({ isActive, humanized, rowIdx, colIdx, grouping, config, tog
 
     const [longPressHandlers] = useLongPress({ onLongPress, onClick });
 
+    // The cell is the grid structure (column position, layout); the inner box
+    // is the actual toggle widget a screen reader/keyboard interacts with.
+    const label = `${instrument ? `${instrument}, ` : ''}step ${colIdx + 1}${humanized ? ', humanized' : ''}`;
+
     return (
         <div
-            ref={padRef}
-            {...longPressHandlers}
-            className={`flex-none cursor-pointer touch-pan-x relative ${config.radiusClass}
-                ${isActive
-                    ? (humanized ? "bg-accent" : "bg-primary")
-                    : "bg-surface-5 hover:bg-border-medium"}
-                ${faded ? 'opacity-30 pointer-events-none' : ''}
-            `}
+            role="gridcell"
+            aria-colindex={colIdx + 1}
+            className={`flex-none ${faded ? 'opacity-30 pointer-events-none' : ''}`}
             style={{
                 width: `${config.cellWidth}px`,
                 marginRight: (colIdx + 1) % grouping === 0 ? `${config.groupGap}px` : undefined,
             }}
-            data-testid="pad"
         >
+            <div
+                ref={padRef}
+                role="checkbox"
+                aria-checked={isActive}
+                aria-label={label}
+                tabIndex={isFocused ? 0 : -1}
+                onFocus={() => onFocusCell?.(rowIdx, colIdx)}
+                data-row={rowIdx}
+                data-col={colIdx}
+                {...longPressHandlers}
+                className={`w-full h-full cursor-pointer touch-pan-x relative ${config.radiusClass}
+                    ${isActive
+                        ? (humanized ? "bg-accent" : "bg-primary")
+                        : "bg-surface-5 hover:bg-border-medium"}
+                `}
+                data-testid="pad"
+            >
+            </div>
         </div>
     );
 };
