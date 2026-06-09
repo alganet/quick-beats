@@ -14,6 +14,7 @@ import {
     getGridOriginOffsetPx,
     isMobileViewport,
     measureWidth,
+    scrollTargetForStep,
     sequenceWidth,
     stepToX,
     xToStep,
@@ -80,5 +81,24 @@ describe('sequencerGeometry', () => {
 
     it('falls back to default zoom config for unknown zoom levels', () => {
         expect(stepToX(4, 4, 999)).toBe(stepToX(4, 4, 1));
+    });
+
+    describe('scrollTargetForStep', () => {
+        // origin 48, viewport 400 wide, grouping 4, zoom 1
+        it('returns null when the step is already within the viewport', () => {
+            expect(scrollTargetForStep(0, 0, 400, 48, 4, 1)).toBeNull();
+            expect(scrollTargetForStep(5, 0, 400, 48, 4, 1)).toBeNull(); // x=192 within [-48,352]
+        });
+
+        it('centers a step that is off the right edge', () => {
+            // step 20 -> x = 20*36 + 5*12 = 780, beyond viewRight (352)
+            // target = round(780 + 48 - 200) = 628
+            expect(scrollTargetForStep(20, 0, 400, 48, 4, 1)).toBe(628);
+        });
+
+        it('clamps to zero when centering a step near the start', () => {
+            // scrolled to 600; step 0 (x=0) is off the left edge; centered target is negative -> 0
+            expect(scrollTargetForStep(0, 600, 400, 48, 4, 1)).toBe(0);
+        });
     });
 });

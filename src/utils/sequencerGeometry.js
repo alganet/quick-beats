@@ -54,6 +54,18 @@ export function measureWidth(stepsPerMeasure, grouping, zoom) {
     return stepsPerMeasure * (config.cellWidth + config.gap) + Math.max(0, groupsInMeasure - 1) * config.groupGap;
 }
 
+// Scroll offset needed to bring `step` into view, centered, or null if it is
+// already within the viewport. Mirrors the visible-range math in Sequencer
+// (content-x compared against [scrollLeft - origin, scrollLeft + width - origin])
+// and the playhead's centering. Used for keyboard focus-into-view.
+export function scrollTargetForStep(step, scrollLeft, containerWidth, gridOriginOffset, grouping, zoom) {
+    const x = stepToX(step, grouping, zoom);
+    const viewLeft = scrollLeft - gridOriginOffset;
+    const viewRight = scrollLeft + containerWidth - gridOriginOffset;
+    if (x >= viewLeft && x <= viewRight) return null; // already visible
+    return Math.max(0, Math.round(x + gridOriginOffset - containerWidth / 2));
+}
+
 export function xToStep(x, stepCount, grouping, zoom) {
     const safeStepCount = Math.max(1, stepCount || 1);
     const maxStep = safeStepCount - 1;

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { useRef, useLayoutEffect, useState, useImperativeHandle, forwardRef, Fragment } from 'react';
+import { FILL_MODES } from '../data/sequencerConfig';
 
 const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, ref) => {
     const [offset, setOffset] = useState(0);
@@ -29,9 +30,35 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
         }
     }, [x]);
 
+    // Metadata per fill mode, keyed by id (built once). The `pattern` previews
+    // which cells the mode fills/clears within two groups.
+    const OPTION_META = {
+        repeat: {
+            id: 'repeat',
+            label: 'Repeat',
+            pattern: (idx) => idx % grouping === colInGroup ? 'fill' : 'none'
+        },
+        alternate: {
+            id: 'alternate',
+            label: 'Alternate',
+            pattern: (idx) => {
+                if (idx === colInGroup) return 'fill';
+                if (idx === colInGroup + grouping) return 'clear';
+                return 'none';
+            }
+        },
+        clear: {
+            id: 'clear',
+            label: 'Clear',
+            pattern: (idx) => idx % grouping === colInGroup ? 'clear' : 'none'
+        }
+    };
+
     return (
         <div
             ref={menuRef}
+            role="menu"
+            aria-label="Fill pattern"
             className="fixed z-[100] bg-surface-3 border border-border-default shadow-2xl rounded-lg overflow-hidden pointer-events-none"
             style={{
                 left: x + offset,
@@ -40,29 +67,16 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
             }}
         >
             <div className="flex flex-col p-1 gap-1">
-                {[
-                    {
-                        id: 'repeat',
-                        label: 'Repeat',
-                        pattern: (idx) => idx % grouping === colInGroup ? 'fill' : 'none'
-                    },
-                    {
-                        id: 'alternate',
-                        label: 'Alternate',
-                        pattern: (idx) => {
-                            if (idx === colInGroup) return 'fill';
-                            if (idx === colInGroup + grouping) return 'clear';
-                            return 'none';
-                        }
-                    },
-                    {
-                        id: 'clear',
-                        label: 'Clear',
-                        pattern: (idx) => idx % grouping === colInGroup ? 'clear' : 'none'
-                    }
-                ].map((opt) => (
+                {/* Rendered in the shared FILL_MODES order so the menu and the
+                    keyboard cycling can't drift apart; unknown ids are skipped
+                    rather than crashing the render. */}
+                {FILL_MODES.map((id) => OPTION_META[id]).filter(Boolean).map((opt) => (
                     <div
                         key={opt.id}
+                        id={`fill-${opt.id}`}
+                        role="menuitemradio"
+                        aria-checked={activeOption === opt.id}
+                        aria-label={opt.label}
                         className={`flex items-center cursor-pointer gap-3 px-3 py-2 rounded-md transition-colors ${activeOption === opt.id ? 'bg-primary text-fg' : 'text-fg-secondary'}`}
                     >
                         <span className="text-[10px] font-bold uppercase tracking-wider w-16">{opt.label}</span>

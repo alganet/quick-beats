@@ -38,6 +38,10 @@ export const ZOOM_CONFIG = {
     }
 };
 
+// Bulk-fill modes, in menu order. Single source of truth shared by the menu
+// render (ContextMenu) and the keyboard cycling (useSequencerSelection).
+export const FILL_MODES = ['repeat', 'alternate', 'clear'];
+
 export const INSTRUMENT_ICONS = {
     "Kick": "kick",
     "Snare": "snare",

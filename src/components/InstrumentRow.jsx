@@ -21,7 +21,9 @@ export function InstrumentRow({
     setMenuState,
     pendingDelete,
     zoom,
-    visibleRange
+    visibleRange,
+    focusedCol = -1,
+    onFocusCell
 }) {
     const config = ZOOM_CONFIG[zoom];
     const start = visibleRange?.start ?? 0;
@@ -33,18 +35,25 @@ export function InstrumentRow({
     const rightSpacerWidth = Math.max(0, totalWidth - leftSpacerWidth - windowWidth);
 
     return (
-        <div data-grid-row="true" className={`flex items-center ${config.heightClass} group hover:bg-highlight/[0.02]`}>
+        <div data-grid-row="true" role="row" aria-rowindex={rowIdx + 1} className={`flex items-center ${config.heightClass} group hover:bg-highlight/[0.02]`}>
             {/* Sticky Instrument Label - Narrowed for Icons */}
-            <div data-grid-label="true" className={`sticky left-0 ${GRID_LAYOUT.rowLabelClass} flex-shrink-0 flex items-center justify-center z-20 bg-surface-1 h-full shadow-[2px_0_5px_var(--color-surface-1)]`} title={instrument}>
-                <Icon id={INSTRUMENT_ICONS[instrument] || 'kick'} className="w-5 h-5 text-fg-secondary" />
+            {/* The sr-only text is the row header's accessible name (reliable
+                "name from content"); the icon is decorative and title is just the
+                sighted hover tooltip. */}
+            <div data-grid-label="true" role="rowheader" className={`sticky left-0 ${GRID_LAYOUT.rowLabelClass} flex-shrink-0 flex items-center justify-center z-20 bg-surface-1 h-full shadow-[2px_0_5px_var(--color-surface-1)]`} title={instrument}>
+                <span className="sr-only">{instrument}</span>
+                <Icon id={INSTRUMENT_ICONS[instrument] || 'kick'} className="w-5 h-5 text-fg-secondary" aria-hidden="true" />
             </div>
+            {/* The lane and window wrappers are presentational so the gridcells
+                hoist to be owned directly by the row (windowed render). */}
             <div
                 data-grid-lane="true"
+                role="presentation"
                 className={`flex-1 flex h-full relative ${GRID_LAYOUT.rowLaneClass}`}
                 style={{ marginRight: `-${config.groupGap}px` }}
             >
                 {leftSpacerWidth > 0 && <div className="flex-none" style={{ width: `${leftSpacerWidth}px` }} aria-hidden="true" />}
-                <div className="flex-none flex h-full" style={{ width: `${windowWidth}px`, columnGap: `${config.gap}px` }}>
+                <div role="presentation" className="flex-none flex h-full" style={{ width: `${windowWidth}px`, columnGap: `${config.gap}px` }}>
                 {gridRow && gridRow.slice(start, end).map((isActive, offsetIdx) => {
                     const colIdx = start + offsetIdx;
                     const measureIdx = Math.floor(colIdx / stepsPerMeasure);
@@ -53,6 +62,7 @@ export function InstrumentRow({
                             key={colIdx}
                             isActive={isActive}
                             humanized={!!humanizedRow?.[colIdx]}
+                            instrument={instrument}
                             rowIdx={rowIdx}
                             colIdx={colIdx}
                             grouping={grouping}
@@ -60,6 +70,8 @@ export function InstrumentRow({
                             toggleStep={toggleStep}
                             setMenuState={setMenuState}
                             faded={pendingDelete === measureIdx}
+                            isFocused={focusedCol === colIdx}
+                            onFocusCell={onFocusCell}
                         />
                     )
                 })}

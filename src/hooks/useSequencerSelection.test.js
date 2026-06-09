@@ -27,7 +27,8 @@ describe('useSequencerSelection', () => {
             y: 0,
             row: null,
             col: null,
-            activeOption: null
+            activeOption: null,
+            source: 'pointer'
         });
     });
 
@@ -202,5 +203,55 @@ describe('useSequencerSelection', () => {
         });
 
         expect(result.current.menuState.isOpen).toBe(false);
+    });
+
+    describe('keyboard-opened menu (source: keyboard)', () => {
+        const openKeyboard = (result, opts = {}) => act(() => {
+            result.current.setMenuState({
+                isOpen: true, x: 0, y: 0, row: 0, col: 0,
+                activeOption: 'repeat', source: 'keyboard', ...opts
+            });
+        });
+
+        it('cycles the active option with arrow keys (wrapping both ways)', () => {
+            const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate: vi.fn() }));
+            openKeyboard(result);
+
+            act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' })));
+            expect(result.current.menuState.activeOption).toBe('alternate');
+            act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' })));
+            expect(result.current.menuState.activeOption).toBe('clear');
+            act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' })));
+            expect(result.current.menuState.activeOption).toBe('repeat'); // wraps forward
+            act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' })));
+            expect(result.current.menuState.activeOption).toBe('clear'); // wraps backward
+        });
+
+        it('commits the active option and closes on Enter', () => {
+            const onBulkUpdate = vi.fn();
+            const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate }));
+            openKeyboard(result, { row: 1, col: 2, activeOption: 'alternate' });
+
+            act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })));
+            expect(onBulkUpdate).toHaveBeenCalledWith(1, 2, 'alternate');
+            expect(result.current.menuState.isOpen).toBe(false);
+        });
+
+        it('closes without committing on Escape', () => {
+            const onBulkUpdate = vi.fn();
+            const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate }));
+            openKeyboard(result);
+
+            act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+            expect(onBulkUpdate).not.toHaveBeenCalled();
+            expect(result.current.menuState.isOpen).toBe(false);
+        });
+
+        it('attaches keydown navigation, not pointer drag listeners', () => {
+            const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate: vi.fn() }));
+            openKeyboard(result);
+            expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
+            expect(addEventListenerSpy).not.toHaveBeenCalledWith('mousemove', expect.any(Function), { passive: false });
+        });
     });
 });
