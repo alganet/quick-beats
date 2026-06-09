@@ -7,6 +7,7 @@ import { useTheme } from './hooks/useTheme'
 import { useAudio } from './hooks/useAudio'
 import { useHumanize } from './hooks/useHumanize'
 import { useSamplePreload } from './hooks/useSamplePreload'
+import { useHashSync } from './hooks/useHashSync'
 import { rescaleOffsets } from './utils/grooveConvert'
 import { HUMANIZE_STYLE } from './data/humanizeStyle'
 import Sequencer from './components/Sequencer'
@@ -19,7 +20,7 @@ import { IconSprite, Icon } from './components/Icons'
 import { INSTRUMENTS } from './data/kit'
 import { BACKBEATS } from './data/patterns'
 import { COMMON_SIGNATURES } from './data/signatures'
-import { parseInitialHash, buildShareHash } from './utils/hashState';
+import { parseInitialHash } from './utils/hashState';
 import {
   calculateBulkUpdate,
   calculateGridWithRemovedMeasure,
@@ -29,7 +30,6 @@ import {
 } from './utils/gridHelpers'
 
 const ACTION_DELAY_MS = 200;
-const HASH_SYNC_DELAY_MS = 180;
 // How long the grid must sit unedited before an auto re-humanize fires. WASM
 // compute is ~5x faster, so it can react much sooner; the JS fallback waits
 // longer to avoid recomputing mid-edit on the slow path.
@@ -52,9 +52,7 @@ function App() {
   // humanized hits. Updated per streamed window, so the tint fills in bar by bar.
   const [humanizedLayer, setHumanizedLayer] = useState(null);
   const idleHumanizeTimeoutRef = useRef(null);
-  const lastHashRef = useRef(typeof window !== 'undefined' && window.location.hash ? window.location.hash.substring(1) : '');
   const bpmApplyTimeoutRef = useRef(null);
-  const hashSyncTimeoutRef = useRef(null);
   const keyboardZoomTimeoutRef = useRef(null);
   const keyboardAutoScrollTimeoutRef = useRef(null);
   // Humanization: the raw performance layer + the bpm its offsets were computed
@@ -340,29 +338,8 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, setBpmInput, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle, humanizeAction]);
 
-  // Update hash when state changes
-  useEffect(() => {
-    if (isSetup && timeSignature && grid.length > 0) {
-      if (hashSyncTimeoutRef.current) {
-        clearTimeout(hashSyncTimeoutRef.current);
-      }
-
-      hashSyncTimeoutRef.current = setTimeout(() => {
-        const hash = buildShareHash({ bpm: bpmInput, sigName: timeSignature.name, kitId: activeKit, grid });
-        if (hash !== lastHashRef.current) {
-          window.history.replaceState(null, '', `#${hash}`);
-          lastHashRef.current = hash;
-        }
-        hashSyncTimeoutRef.current = null;
-      }, HASH_SYNC_DELAY_MS);
-    }
-
-    return () => {
-      if (hashSyncTimeoutRef.current) {
-        clearTimeout(hashSyncTimeoutRef.current);
-      }
-    };
-  }, [grid, bpmInput, timeSignature, isSetup, activeKit]);
+  // Keep the URL hash in sync with the live pattern (debounced).
+  useHashSync({ isSetup, timeSignature, grid, bpmInput, activeKit });
 
   // Sync BPM to audio engine on a short delay so UI can update instantly while
   // avoiding excessive tempo updates during rapid user input.
