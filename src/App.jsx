@@ -19,7 +19,7 @@ import { IconSprite, Icon } from './components/Icons'
 import { INSTRUMENTS } from './data/kit'
 import { BACKBEATS } from './data/patterns'
 import { COMMON_SIGNATURES } from './data/signatures'
-import { parseShareHash, buildShareHash } from './utils/hashState';
+import { parseInitialHash, buildShareHash } from './utils/hashState';
 import {
   calculateBulkUpdate,
   calculateGridWithRemovedMeasure,
@@ -64,12 +64,8 @@ function App() {
   const bpmInputRef = useRef(120);
   const gridRef = useRef([]);
 
-  const _parsedHash = typeof window !== 'undefined'
-    ? parseShareHash(window.location.hash.substring(1), INSTRUMENTS.length)
-    : null;
-
-  const _initialHash = _parsedHash && COMMON_SIGNATURES.find(s => s.name === _parsedHash.sigName)
-    ? { success: true, bpm: _parsedHash.bpm, sig: COMMON_SIGNATURES.find(s => s.name === _parsedHash.sigName), kitId: _parsedHash.kitId, grid: _parsedHash.grid }
+  const _initialHash = typeof window !== 'undefined'
+    ? parseInitialHash(window.location.hash.substring(1), INSTRUMENTS.length, COMMON_SIGNATURES)
     : null;
 
   const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
