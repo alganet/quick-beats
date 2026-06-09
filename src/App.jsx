@@ -8,6 +8,7 @@ import { useAudio } from './hooks/useAudio'
 import { useHumanize } from './hooks/useHumanize'
 import { useSamplePreload } from './hooks/useSamplePreload'
 import { useHashSync } from './hooks/useHashSync'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { rescaleOffsets } from './utils/grooveConvert'
 import { HUMANIZE_STYLE } from './data/humanizeStyle'
 import Sequencer from './components/Sequencer'
@@ -53,8 +54,6 @@ function App() {
   const [humanizedLayer, setHumanizedLayer] = useState(null);
   const idleHumanizeTimeoutRef = useRef(null);
   const bpmApplyTimeoutRef = useRef(null);
-  const keyboardZoomTimeoutRef = useRef(null);
-  const keyboardAutoScrollTimeoutRef = useRef(null);
   // Humanization: the raw performance layer + the bpm its offsets were computed
   // at, so bpm changes rescale microtiming without re-running the model.
   const perfLayerRef = useRef(null);
@@ -136,39 +135,6 @@ function App() {
     }
     return undefined;
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (keyboardZoomTimeoutRef.current) {
-        clearTimeout(keyboardZoomTimeoutRef.current);
-      }
-      if (keyboardAutoScrollTimeoutRef.current) {
-        clearTimeout(keyboardAutoScrollTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const scheduleKeyboardZoomToggle = useCallback(() => {
-    if (keyboardZoomTimeoutRef.current) {
-      clearTimeout(keyboardZoomTimeoutRef.current);
-    }
-
-    keyboardZoomTimeoutRef.current = setTimeout(() => {
-      keyboardZoomTimeoutRef.current = null;
-      setZoom((z) => (z + 1) % 3);
-    }, ACTION_DELAY_MS);
-  }, [setZoom]);
-
-  const scheduleKeyboardAutoScrollToggle = useCallback(() => {
-    if (keyboardAutoScrollTimeoutRef.current) {
-      clearTimeout(keyboardAutoScrollTimeoutRef.current);
-    }
-
-    keyboardAutoScrollTimeoutRef.current = setTimeout(() => {
-      keyboardAutoScrollTimeoutRef.current = null;
-      setAutoScroll((a) => !a);
-    }, ACTION_DELAY_MS);
-  }, [setAutoScroll]);
 
   // Humanization plays when toggled on and the signature is supported.
   const humanizeActive = humanizeOn && humanizeSupported;
@@ -280,63 +246,15 @@ function App() {
     resetHumanization();
   }, [timeSignature, resetHumanization]);
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Ignore when typing in form controls
-      const tag = e.target?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-
-      // Space => play / pause
-      if (e.code === 'Space' || e.key === ' ') {
-        e.preventDefault();
-        togglePlay?.();
-        return;
-      }
-
-      // ? => show help
-      if (e.key === '?') {
-        setIsHelpOpen(true);
-        return;
-      }
-
-      // - / = => BPM down / up (clamped to range used by UI)
-      if (e.key === '-') {
-        setBpmInput((prev) => Math.max(60, prev - 1));
-        return;
-      }
-      if (e.key === '=') {
-        setBpmInput((prev) => Math.min(240, prev + 1));
-        return;
-      }
-
-      // z => toggle zoom
-      if (typeof e.key === 'string' && e.key.toLowerCase() === 'z') {
-        scheduleKeyboardZoomToggle();
-        return;
-      }
-
-      // s => toggle auto-scroll
-      if (typeof e.key === 'string' && e.key.toLowerCase() === 's') {
-        scheduleKeyboardAutoScrollToggle();
-        return;
-      }
-
-      // h => humanize / remove (same action as clicking the button)
-      if (typeof e.key === 'string' && e.key.toLowerCase() === 'h') {
-        humanizeAction();
-        return;
-      }
-
-      // Preserve existing Escape behavior for modals
-      if (e.key === 'Escape') {
-        setIsShareOpen(false);
-        setIsHelpOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlay, setBpmInput, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle, humanizeAction]);
+  useKeyboardShortcuts({
+    togglePlay,
+    setBpmInput,
+    setZoom,
+    setAutoScroll,
+    setIsHelpOpen,
+    setIsShareOpen,
+    humanizeAction,
+  });
 
   // Keep the URL hash in sync with the live pattern (debounced).
   useHashSync({ isSetup, timeSignature, grid, bpmInput, activeKit });
