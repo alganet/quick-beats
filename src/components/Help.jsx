@@ -93,6 +93,25 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                     </HelpSection>
                 )}
 
+                {/* Drum Sounds */}
+                <HelpSection title="Drum Sounds">
+                    <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
+                        <div className="flex items-center gap-2 m-auto flex-shrink-0">
+                            <div className="w-8 h-8 flex items-center justify-center bg-surface-5 text-fg-muted">
+                                <Icon id="kit" className="w-4 h-4" />
+                            </div>
+                        </div>
+                        <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
+                            Click the kit button to switch drum sounds — on the setup screen or
+                            from the toolbar. The chosen kit loads on demand and swaps in
+                            <span className="text-fg"> seamlessly</span>, even mid-playback; a small
+                            ring shows download progress. Your choice is remembered and travels with
+                            shared links. Kits: <span className="text-fg">Black Pearl</span> and
+                            <span className="text-fg"> Red Zeppelin</span>.
+                        </p>
+                    </div>
+                </HelpSection>
+
                 {/* Zoom */}
                 <HelpSection title="Zoom">
                     <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
@@ -276,7 +295,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                         <span className="bg-surface-0 px-2 py-1 border border-border-dim">React 19</span>
                         <span className="bg-surface-0 px-2 py-1 border border-border-dim">Tailwind CSS</span>
                         <span className="bg-surface-0 px-2 py-1 border border-border-dim">Vite</span>
-                        <span className="bg-surface-0 px-2 py-1 border border-border-dim">AV Linux Black Pearl Kit</span>
+                        <span className="bg-surface-0 px-2 py-1 border border-border-dim">AV Linux Drumkits (Black Pearl, Red Zeppelin)</span>
                     </div>
                     <p className="text-fg-secondary text-xs md:text-sm leading-relaxed text-center">The full code is avaliable under the ISC license on <a href="https://github.com/alganet/quick-beats" target="_blank" className="text-fg underline cursor-pointer">GitHub</a>.</p>
                 </HelpSection>

@@ -66,6 +66,7 @@ describe('Help', () => {
     it('renders all help sections', () => {
         render(<Help isOpen={true} onClose={() => {}} />);
 
+        expect(screen.getByText('Drum Sounds')).toBeInTheDocument();
         expect(screen.getByText('Long Press — Fill Patterns')).toBeInTheDocument();
         expect(screen.getByText('Adding Measures')).toBeInTheDocument();
         expect(screen.getByText('Deleting Measures')).toBeInTheDocument();

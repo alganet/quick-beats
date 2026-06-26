@@ -11,6 +11,21 @@
 import { KITS } from '../data/kit';
 
 /**
+ * Resolve a kit sample path (e.g. "/samples/.../kick.wav") to a fetchable URL
+ * under the app's base. Shared by the prefetch (cache warm) and the Tone.Player
+ * load so both hit the SAME URL — otherwise the prefetch warms a different key
+ * than the player fetches and the gapless/cached switch silently re-downloads.
+ *
+ * @param {string} path
+ * @returns {string}
+ */
+export const sampleUrl = (path) => {
+    const base = import.meta.env?.BASE_URL ?? '/';
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    return `${base}${cleanPath}`;
+};
+
+/**
  * Prefetch every sample of `kitId` into the browser's HTTP cache. Resolves once
  * all requests settle; never rejects (a failed file just doesn't get cached —
  * Tone's own fetch on first play is the fallback).
@@ -25,11 +40,7 @@ export const prefetchKitSamples = async (kitId, onProgress) => {
         return;
     }
 
-    const base = import.meta.env?.BASE_URL ?? '/';
-    const urls = Object.values(kit.samples).map((path) => {
-        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-        return `${base}${cleanPath}`;
-    });
+    const urls = Object.values(kit.samples).map(sampleUrl);
 
     const total = urls.length;
     if (total === 0) {

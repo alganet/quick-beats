@@ -31,6 +31,21 @@ describe('kit data', () => {
                 });
             });
         });
+
+        it('should have a "red-zeppelin" kit', () => {
+            expect(KITS['red-zeppelin']).toBeDefined();
+            expect(KITS['red-zeppelin'].name).toBe('Red Zeppelin');
+        });
+
+        // Hard constraint: grid rows are indexed by INSTRUMENTS, so every kit must
+        // expose the same instrument keys in the same order — a kit only swaps the
+        // audio behind the fixed rows, never the row set.
+        it('every kit shares the same instrument keys in the same order', () => {
+            const expected = INSTRUMENTS;
+            Object.entries(KITS).forEach(([_id, kit]) => {
+                expect(Object.keys(kit.samples)).toEqual(expected);
+            });
+        });
     });
 
     describe('KIT (backward compatibility)', () => {
@@ -57,8 +72,8 @@ describe('kit data', () => {
     });
 
     describe('DEFAULT_KIT_ID', () => {
-        it('should be "black-pearl"', () => {
-            expect(DEFAULT_KIT_ID).toBe('black-pearl');
+        it('should be "red-zeppelin"', () => {
+            expect(DEFAULT_KIT_ID).toBe('red-zeppelin');
         });
 
         it('should reference an existing kit', () => {

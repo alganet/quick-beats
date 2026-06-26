@@ -2,34 +2,15 @@
 //
 // SPDX-License-Identifier: ISC
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "./Icons";
+import ProgressRing from "./ProgressRing";
+import { useDismiss } from "../hooks/useDismiss";
 
 const POPOVER_COPY = {
     unavailable: "Humanize works on 16th-note grids (4/4, 3/4, 5/4). It's off for this time signature.",
     error: "Couldn't load the humanize model. Check your connection, then retry.",
 };
-
-// Small ring that fills clockwise with `progress` (0..1), wrapping the humanize
-// icon while the model downloads. r=15 in a 36-box -> circumference ~94.2.
-const RING_CIRC = 2 * Math.PI * 15;
-
-function ProgressRing({ progress }) {
-    const p = Math.max(0, Math.min(1, progress));
-    return (
-        <span className="relative w-6 h-6 grid place-items-center">
-            <svg viewBox="0 0 36 36" className="absolute inset-0 w-full h-full -rotate-90">
-                <circle cx="18" cy="18" r="15" fill="none" strokeWidth="3" className="stroke-surface-3" />
-                <circle
-                    cx="18" cy="18" r="15" fill="none" strokeWidth="3" strokeLinecap="round"
-                    className="stroke-primary transition-[stroke-dasharray] duration-200 ease-out"
-                    strokeDasharray={`${p * RING_CIRC} ${RING_CIRC}`}
-                />
-            </svg>
-            <Icon id="humanize" className="w-3 h-3 text-fg-muted" />
-        </span>
-    );
-}
 
 const TITLES = {
     off: "Humanize the beat",
@@ -63,19 +44,7 @@ export default function HumanizeButton({ status, progress = 0, onClick }) {
     const pending = status === "pending";
     const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
 
-    useEffect(() => {
-        if (!popoverOpen) return undefined;
-        const onKey = (e) => { if (e.key === "Escape") setPopoverOpen(false); };
-        const onDown = (e) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setPopoverOpen(false);
-        };
-        document.addEventListener("keydown", onKey);
-        document.addEventListener("mousedown", onDown);
-        return () => {
-            document.removeEventListener("keydown", onKey);
-            document.removeEventListener("mousedown", onDown);
-        };
-    }, [popoverOpen]);
+    useDismiss(popoverOpen, wrapperRef, () => setPopoverOpen(false));
 
     if (blocked) {
         const popoverText = loading
@@ -104,7 +73,7 @@ export default function HumanizeButton({ status, progress = 0, onClick }) {
                     aria-describedby={popoverOpen ? "humanize-popover" : undefined}
                 >
                     {loading
-                        ? <ProgressRing progress={progress} />
+                        ? <ProgressRing progress={progress}><Icon id="humanize" className="w-3 h-3 text-fg-muted" /></ProgressRing>
                         : <Icon id="humanize" className="w-4 h-4 text-fg-muted opacity-30" />}
                 </button>
                 {popoverOpen && (
