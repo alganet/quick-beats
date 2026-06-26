@@ -39,6 +39,20 @@ export default defineConfig([
       'jsx-a11y/click-events-have-key-events': 'warn',
     },
   },
+  // Service worker runs in a worker global scope (self, caches, clients, ...)
+  {
+    files: ['public/sw.js'],
+    languageOptions: {
+      globals: globals.serviceworker,
+    },
+  },
+  // Build scripts run in Node (Buffer, process, ...)
+  {
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
   // Test files configuration
   {
     files: ['**/*.test.{js,jsx}', 'src/test/**/*.js'],
