@@ -6,12 +6,14 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Icon } from "./Icons";
 import HumanizeButton from "./HumanizeButton";
+import DrumKitButton from "./DrumKitButton";
 
 const ACTION_DELAY_MS = 200;
 
 export default function Controls({
     isPlaying, togglePlay, bpm, setBpm, autoScroll, setAutoScroll, canScroll, zoom, setZoom,
     humanizeStatus, humanizeProgress, onHumanize,
+    kits, activeKit, switchingKit, kitProgress, onSelectKit,
 }) {
     const zoomToggleTimeoutRef = useRef(null);
     const autoScrollToggleTimeoutRef = useRef(null);
@@ -99,6 +101,15 @@ export default function Controls({
 
             {/* Controls Group: Right */}
             <div className="flex-1 flex items-center justify-end gap-3 ml-0">
+
+                {/* Drum-sound switcher (on-demand, gapless) */}
+                <DrumKitButton
+                    kits={kits}
+                    activeKit={activeKit}
+                    switchingTo={switchingKit}
+                    progress={kitProgress}
+                    onSelectKit={onSelectKit}
+                />
 
                 {/* Humanize toggle (off / on / pending) */}
                 <HumanizeButton status={humanizeStatus} progress={humanizeProgress} onClick={onHumanize} />

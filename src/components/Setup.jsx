@@ -5,8 +5,12 @@
 
 import { COMMON_SIGNATURES } from '../data/signatures';
 import { Icon } from './Icons';
+import DrumKitButton from './DrumKitButton';
 
-export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) {
+export default function Setup({
+    onSelect, onConfirm, selectedSig, onShowHelp,
+    kits, activeKit, switchingKit, kitProgress, onSelectKit,
+}) {
     return (
         <div className="min-w-[360px] z-40 min-h-screen w-full flex flex-col items-center justify-start md:justify-center bg-surface-0 p-6 overflow-y-auto py-12 md:py-6 relative">
             <button
@@ -22,6 +26,20 @@ export default function Setup({ onSelect, onConfirm, selectedSig, onShowHelp }) 
                         Quick Beats
                     </h1>
                     <p className="text-fg-muted text-sm font-mono uppercase tracking-[0.2em]">Select Tempo & Preview</p>
+
+                    {/* Drum-sound picker — the preview plays the chosen kit */}
+                    {onSelectKit && (
+                        <div className="flex items-center justify-center gap-2 mt-5">
+                            <span className="text-fg-faint text-[10px] font-mono uppercase tracking-[0.2em]">Drum Kit</span>
+                            <DrumKitButton
+                                kits={kits}
+                                activeKit={activeKit}
+                                switchingTo={switchingKit}
+                                progress={kitProgress}
+                                onSelectKit={onSelectKit}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-16">

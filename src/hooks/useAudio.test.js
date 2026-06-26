@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: ISC
 
+import { StrictMode } from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAudio } from './useAudio';
@@ -414,5 +415,110 @@ describe('useAudio', () => {
         act(() => { loopCallback(10); });
         expect(warnSpy).toHaveBeenCalled();
         warnSpy.mockRestore();
+    });
+
+    describe('kit switching', () => {
+        it('switches kits gaplessly: builds the new kit before disposing the old', async () => {
+            const { result } = renderHook(() => useAudio());
+            await act(async () => { await result.current.loadKit('black-pearl'); });
+            const bpPlayers = [...createdPlayers];
+            const bpCount = bpPlayers.length;
+
+            await act(async () => { await result.current.loadKit('red-zeppelin'); });
+
+            // The new kit's players were built...
+            const rzPlayers = createdPlayers.slice(bpCount);
+            expect(rzPlayers.length).toBe(bpCount);
+            expect(rzPlayers.every((p) => p.url.includes('RED_ZEPPELIN'))).toBe(true);
+
+            // ...the old kit's players were disposed, the new ones were not.
+            expect(bpPlayers.every((p) => p.dispose.mock.calls.length > 0)).toBe(true);
+            expect(rzPlayers.every((p) => p.dispose.mock.calls.length === 0)).toBe(true);
+
+            // Build-before-swap: every new Player is constructed BEFORE any old
+            // player is disposed, so the playback loop never sees a missing chain.
+            const order = Tone.Player.mock.invocationCallOrder;
+            const lastNewBuild = Math.max(...rzPlayers.map((_p, i) => order[bpCount + i]));
+            const firstOldDispose = Math.min(...bpPlayers.map((p) => p.dispose.mock.invocationCallOrder[0]));
+            expect(lastNewBuild).toBeLessThan(firstOldDispose);
+
+            expect(result.current.activeKit).toBe('red-zeppelin');
+        });
+
+        it('last-wins: a superseded switch leaves no extra live players', async () => {
+            const { result } = renderHook(() => useAudio());
+            await act(async () => { await result.current.loadKit('black-pearl'); });
+            const bpCount = createdPlayers.length;
+
+            await act(async () => {
+                const a = result.current.loadKit('red-zeppelin');
+                const b = result.current.loadKit('red-zeppelin');
+                await Promise.all([a, b]);
+            });
+
+            // Exactly one RZ install is live; the engine ends on red-zeppelin.
+            const liveRz = createdPlayers.filter(
+                (p) => p.url.includes('RED_ZEPPELIN') && p.dispose.mock.calls.length === 0,
+            );
+            expect(liveRz.length).toBe(bpCount);
+            expect(result.current.activeKit).toBe('red-zeppelin');
+        });
+
+        it('first play lazy-loads the preferred (initial) kit, not the default', async () => {
+            const { result } = renderHook(() => useAudio('red-zeppelin'));
+            expect(result.current.activeKit).toBe('red-zeppelin');
+
+            await act(async () => { await result.current.togglePlay(); });
+
+            expect(createdPlayers.some((p) => p.url.includes('RED_ZEPPELIN'))).toBe(true);
+            expect(createdPlayers.every((p) => !p.url.includes('BLACK_PEARL'))).toBe(true);
+            expect(result.current.activeKit).toBe('red-zeppelin');
+        });
+
+        it('no-ops (and reports complete) when re-selecting the active kit', async () => {
+            const { result } = renderHook(() => useAudio());
+            await act(async () => { await result.current.loadKit('black-pearl'); });
+            const count = createdPlayers.length;
+            const onProgress = vi.fn();
+
+            await act(async () => { await result.current.loadKit('black-pearl', onProgress); });
+
+            expect(createdPlayers.length).toBe(count); // no rebuild
+            expect(onProgress).toHaveBeenCalledWith(1);
+        });
+
+        it('still loads under StrictMode (mountedRef survives the setup→cleanup→setup cycle)', async () => {
+            // Regression: StrictMode runs the cleanup effect (which clears mountedRef)
+            // between two setups. If setup doesn't re-set it true, loadKit bails on
+            // !mountedRef.current and disposes the new chains → silence.
+            const { result } = renderHook(() => useAudio(), { wrapper: StrictMode });
+            await act(async () => { await result.current.loadKit('black-pearl'); });
+
+            expect(result.current.isLoaded).toBe(true);
+            expect(result.current.activeKit).toBe('black-pearl');
+            expect(createdPlayers.length).toBeGreaterThan(0);
+            expect(createdPlayers.every((p) => p.dispose.mock.calls.length === 0)).toBe(true);
+        });
+
+        it('keeps the current kit and disposes the new chains when a switch fails to load', async () => {
+            const { result } = renderHook(() => useAudio());
+            await act(async () => { await result.current.loadKit('black-pearl'); });
+            const bpPlayers = [...createdPlayers];
+            const bpCount = bpPlayers.length;
+
+            // A sample fails to decode/load: Tone.loaded() rejects for this switch.
+            Tone.loaded.mockRejectedValueOnce(new Error('decode failed'));
+            // Must not throw out of loadKit (would wedge togglePlay/handleSelectKit).
+            await act(async () => { await result.current.loadKit('red-zeppelin'); });
+
+            const rzPlayers = createdPlayers.slice(bpCount);
+            expect(rzPlayers.length).toBe(bpCount);
+            // The half-built kit's nodes are all disposed (no leak)...
+            expect(rzPlayers.every((p) => p.dispose.mock.calls.length > 0)).toBe(true);
+            // ...and the previous kit stays live and active.
+            expect(bpPlayers.every((p) => p.dispose.mock.calls.length === 0)).toBe(true);
+            expect(result.current.activeKit).toBe('black-pearl');
+            expect(result.current.isLoaded).toBe(true);
+        });
     });
 });

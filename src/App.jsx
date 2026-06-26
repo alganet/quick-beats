@@ -17,7 +17,7 @@ import LoadingScreen from './components/LoadingScreen'
 import ShareModal from './components/ShareModal'
 import Help from './components/Help'
 import { IconSprite, Icon } from './components/Icons'
-import { INSTRUMENTS } from './data/kit'
+import { INSTRUMENTS, KITS, DEFAULT_KIT_ID } from './data/kit'
 import { BACKBEATS } from './data/patterns'
 import { COMMON_SIGNATURES } from './data/signatures'
 import { parseInitialHash } from './utils/hashState';
@@ -33,14 +33,47 @@ const ACTION_DELAY_MS = 200;
 
 function App() {
   const [theme, , toggleTheme] = useTheme();
-  const { ready: assetsReady, progress: assetsProgress } = useSamplePreload();
-  const { isPlaying, currentStep, activeKit, togglePlay, setBpm, updateGrid, setStep, playNote, setPerfLayer, setHumanizeEnabled, setHumanizeOptions } = useAudio();
-  const humanize = useHumanize();
-  const bpmApplyTimeoutRef = useRef(null);
 
   const _initialHash = typeof window !== 'undefined'
     ? parseInitialHash(window.location.hash.substring(1), INSTRUMENTS.length, COMMON_SIGNATURES)
     : null;
+
+  // Which kit to start on: a shared link wins, then the last choice persisted in
+  // localStorage, then the default. Validated against KITS so a stale/unknown id
+  // can never leave us with no sounds. Resolved once on mount (the hooks below
+  // capture it as their initial value) — not re-read on every render.
+  const [_preferredKitId] = useState(() => {
+    if (_initialHash?.kitId && KITS[_initialHash.kitId]) return _initialHash.kitId;
+    try {
+      const saved = localStorage.getItem('qb-kit');
+      if (saved && KITS[saved]) return saved;
+    } catch { /* ignore */ }
+    return DEFAULT_KIT_ID;
+  });
+
+  const { ready: assetsReady, progress: assetsProgress } = useSamplePreload(_preferredKitId);
+  const { isPlaying, currentStep, activeKit, loadKit, togglePlay, setBpm, updateGrid, setStep, playNote, setPerfLayer, setHumanizeEnabled, setHumanizeOptions } = useAudio(_preferredKitId);
+  const humanize = useHumanize();
+  const bpmApplyTimeoutRef = useRef(null);
+
+  // Drum-kit switch progress (unobtrusive, like humanize): which kit is loading
+  // and how far along. The engine swaps gaplessly when loadKit resolves.
+  const [switchingKit, setSwitchingKit] = useState(null);
+  const [kitProgress, setKitProgress] = useState(0);
+
+  const handleSelectKit = useCallback(async (kitId) => {
+    // Ignore the kit already playing, the one already mid-switch (a second click
+    // would restart its download and reset progress), and unknown ids.
+    if (kitId === activeKit || kitId === switchingKit || !KITS[kitId]) return;
+    setSwitchingKit(kitId);
+    setKitProgress(0);
+    try {
+      await loadKit(kitId, setKitProgress);
+    } finally {
+      // Only clear if a newer switch hasn't already taken over (last-wins).
+      setSwitchingKit((prev) => (prev === kitId ? null : prev));
+    }
+  }, [activeKit, switchingKit, loadKit]);
 
   const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -81,6 +114,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('qb-zoom', zoom.toString());
   }, [zoom]);
+
+  // Remember the chosen kit so it's restored on the next visit.
+  useEffect(() => {
+    localStorage.setItem('qb-kit', activeKit);
+  }, [activeKit]);
 
   // Global keyboard shortcuts
   const [showKeyboardCheatsheet, setShowKeyboardCheatsheet] = useState(() => {
@@ -228,6 +266,11 @@ function App() {
           onConfirm={handleConfirm}
           selectedSig={previewSig}
           onShowHelp={() => setIsHelpOpen(true)}
+          kits={KITS}
+          activeKit={activeKit}
+          switchingKit={switchingKit}
+          kitProgress={kitProgress}
+          onSelectKit={handleSelectKit}
           className="min-h-full"
         />
       </>
@@ -323,6 +366,11 @@ function App() {
             humanizeStatus={humanizeStatus}
             humanizeProgress={modelProgress}
             onHumanize={humanizeAction}
+            kits={KITS}
+            activeKit={activeKit}
+            switchingKit={switchingKit}
+            kitProgress={kitProgress}
+            onSelectKit={handleSelectKit}
           />
         </div>
 

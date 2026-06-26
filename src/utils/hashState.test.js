@@ -245,6 +245,14 @@ describe('hashState', () => {
             expect(result.grid).toEqual(grid);
         });
 
+        it('round-trips a non-default kit (red-zeppelin) so a shared link restores it', () => {
+            const grid = [[true, false], [false, true]];
+            const hash = buildShareHash({ bpm: 120, sigName: '4/4', kitId: 'red-zeppelin', grid });
+            const result = parseInitialHash(hash, 2, SIGNATURES);
+            expect(result).not.toBeNull();
+            expect(result.kitId).toBe('red-zeppelin');
+        });
+
         it('returns null when the signature name is unknown', () => {
             const grid = [[true, false], [false, true]];
             const hash = buildShareHash({ bpm: 120, sigName: '7/8', kitId: 'black-pearl', grid });

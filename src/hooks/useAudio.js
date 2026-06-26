@@ -5,12 +5,22 @@
 import { startTransition, useEffect, useState, useRef, useCallback } from "react";
 import * as Tone from "tone";
 import { KITS, INSTRUMENTS, DEFAULT_KIT_ID } from "../data/kit";
+import { prefetchKitSamples, sampleUrl } from "../utils/preloadSamples";
 
-export function useAudio() {
+export function useAudio(initialKitId = DEFAULT_KIT_ID) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
-    const [activeKit, setActiveKit] = useState(DEFAULT_KIT_ID);
+    const [activeKit, setActiveKit] = useState(initialKitId);
+    // Mirror of activeKit for the togglePlay/loadKit closures (lazy first play
+    // and the no-op switch guard read it without re-subscribing).
+    const activeKitRef = useRef(initialKitId);
+    // Monotonic token so a newer switch always wins: a stale load that resolves
+    // late discards its freshly-built chains instead of clobbering the new kit.
+    const switchTokenRef = useRef(0);
+    // Cleared on unmount so an in-flight switch that resolves afterwards disposes
+    // its freshly-built chains instead of installing orphaned (un-disposable) ones.
+    const mountedRef = useRef(true);
     const players = useRef(null);
     const sequence = useRef(null);
     const gridRef = useRef([]);
@@ -29,65 +39,106 @@ export function useAudio() {
     // audio thread so the loop reads, never computes.
     const appliedLayerRef = useRef(null);
 
-    const disposePlayers = useCallback(() => {
-        const current = players.current;
-        if (!current) return;
-        Object.values(current).forEach(({ player, gain }) => {
+    const disposeChains = useCallback((chains) => {
+        if (!chains) return;
+        Object.values(chains).forEach(({ player, gain }) => {
             try { player?.dispose?.(); } catch { /* ignore */ }
             try { gain?.dispose?.(); } catch { /* ignore */ }
         });
-        players.current = null;
     }, []);
 
-    const loadKit = useCallback(async (kitId) => {
-        const kit = KITS[kitId];
-        if (!kit) return;
-
-        setIsLoaded(false);
-        isLoadedRef.current = false;
-        disposePlayers();
-
-        // One Player -> Gain -> destination chain per instrument so we can apply
-        // a per-hit gain (velocity) when humanization is on. A single Tone.Players
-        // has no per-hit gain. players.current = { [name]: { player, gain } }.
+    // Build one Player -> Gain -> destination chain per instrument so we can apply
+    // a per-hit gain (velocity) when humanization is on (a single Tone.Players has
+    // no per-hit gain). Returns { [name]: { player, gain, lastGain } } WITHOUT
+    // installing it, so the caller can decode before an atomic swap.
+    const buildChains = useCallback((kit) => {
         const chains = {};
         Object.entries(kit.samples).forEach(([name, path]) => {
-            // Remove leading slash if present and prepend BASE_URL
-            const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-            const url = `${import.meta.env.BASE_URL}${cleanPath}`;
+            // Same URL the prefetch warmed, so the player loads from cache.
             const gain = new Tone.Gain(1).toDestination();
-            const player = new Tone.Player(url).connect(gain);
+            const player = new Tone.Player(sampleUrl(path)).connect(gain);
             // Track the last-applied gain so the loop only writes the Web Audio gain
             // param when it actually changes (a flat beat then just .start()s).
             chains[name] = { player, gain, lastGain: 1 };
         });
-        players.current = chains;
+        return chains;
+    }, []);
 
-        await Tone.loaded();
+    // Load (or switch to) a kit. Switching is GAPLESS: the currently-playing kit
+    // keeps sounding while the new samples download + decode, and is only swapped
+    // out — and disposed — once the new chains are ready. Concurrent switches are
+    // last-wins via switchTokenRef. `onProgress(0..1)` mirrors the prefetch.
+    const loadKit = useCallback(async (kitId, onProgress) => {
+        const kit = KITS[kitId];
+        if (!kit) return;
+
+        // Already on this kit and loaded: nothing to do.
+        if (kitId === activeKitRef.current && isLoadedRef.current) {
+            onProgress?.(1);
+            return;
+        }
+
+        const token = ++switchTokenRef.current;
+
+        // Warm the HTTP cache first — this is what drives the 0..1 progress. The
+        // build below then decodes from cache, fast. Old players stay live.
+        await prefetchKitSamples(kitId, onProgress);
+        if (token !== switchTokenRef.current) return; // superseded mid-download
+
+        const chains = buildChains(kit);
+        try {
+            await Tone.loaded();
+        } catch {
+            // A sample failed to load/decode: drop the half-built kit and keep the
+            // current one playing (the gapless contract). Never leak the new nodes,
+            // and never let the rejection escape to wedge togglePlay/handleSelectKit.
+            disposeChains(chains);
+            return;
+        }
+
+        // A newer switch started while we decoded, or we unmounted — drop ours.
+        if (token !== switchTokenRef.current || !mountedRef.current) {
+            disposeChains(chains);
+            return;
+        }
+
+        // Atomic swap: install the new kit, then dispose the previous one so the
+        // playback loop never observes a missing chain.
+        const previous = players.current;
+        players.current = chains;
+        disposeChains(previous);
+
+        activeKitRef.current = kitId;
+        setActiveKit(kitId);
         setIsLoaded(true);
         isLoadedRef.current = true;
-        setActiveKit(kitId);
-    }, [disposePlayers]);
+        onProgress?.(1);
+    }, [buildChains, disposeChains]);
 
     // Ensure players are cleaned up on unmount. Kit loading is done lazily
     // to avoid creating/resuming an AudioContext before a user gesture (browser
     // autoplay policy triggers a console warning otherwise).
     useEffect(() => {
+        // Set in setup (not just cleared in cleanup) so StrictMode's
+        // setup→cleanup→setup cycle leaves it true, not stuck false.
+        mountedRef.current = true;
         return () => {
-            disposePlayers();
+            mountedRef.current = false;
+            disposeChains(players.current);
+            players.current = null;
         };
-    }, [disposePlayers]);
+    }, [disposeChains]);
 
     const updateGrid = useCallback((newGrid) => {
         gridRef.current = newGrid;
     }, []);
 
     const togglePlay = useCallback(async () => {
-        // Lazy-load the default kit on first user-driven playback so we don't
+        // Lazy-load the preferred kit on first user-driven playback so we don't
         // create or resume the AudioContext during page load (avoids browser
-        // autoplay warnings).
+        // autoplay warnings). activeKitRef carries any restored/persisted kit.
         if (!isLoadedRef.current) {
-            await loadKit(DEFAULT_KIT_ID);
+            await loadKit(activeKitRef.current);
         }
 
         if (Tone.getTransport().state === "started") {

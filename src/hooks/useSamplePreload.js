@@ -11,9 +11,11 @@ import { DEFAULT_KIT_ID } from '../data/kit';
  * the app can show a brief loading screen before any UX. Kept as its own hook
  * (rather than inlined in App) so tests can mock it and skip the gate.
  *
+ * @param {string} [kitId] the kit to warm — the preferred (restored/persisted)
+ *   kit so its first play decodes from cache. Defaults to the default kit.
  * @returns {{ ready: boolean, progress: number }}
  */
-export function useSamplePreload() {
+export function useSamplePreload(kitId = DEFAULT_KIT_ID) {
     const [ready, setReady] = useState(false);
     const [progress, setProgress] = useState(0);
     const startedRef = useRef(false);
@@ -27,9 +29,11 @@ export function useSamplePreload() {
         if (startedRef.current) return;
         startedRef.current = true;
 
-        prefetchKitSamples(DEFAULT_KIT_ID, setProgress)
+        prefetchKitSamples(kitId, setProgress)
             .catch(() => { /* prefetch never rejects, but never block the UI on it */ })
             .finally(() => setReady(true));
+        // kitId is read once on mount; intentionally not re-run on change.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return { ready, progress };

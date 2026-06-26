@@ -105,6 +105,34 @@ describe('Setup', () => {
         expect(fourFourButton).toHaveClass('border-accent');
     });
 
+    const KITS = {
+        'black-pearl': { name: 'Black Pearl', samples: {} },
+        'red-zeppelin': { name: 'Red Zeppelin', samples: {} },
+    };
+
+    it('renders the drum-kit switcher when kit props are provided', () => {
+        renderWithSprite(
+            <Setup {...defaultProps} kits={KITS} activeKit="black-pearl" onSelectKit={vi.fn()} />
+        );
+        expect(screen.getByText('Drum Kit')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /drum kit: black pearl/i })).toBeInTheDocument();
+    });
+
+    it('omits the switcher when no onSelectKit is provided', () => {
+        renderWithSprite(<Setup {...defaultProps} />);
+        expect(screen.queryByText('Drum Kit')).not.toBeInTheDocument();
+    });
+
+    it('switches kit from the setup screen', () => {
+        const onSelectKit = vi.fn();
+        renderWithSprite(
+            <Setup {...defaultProps} kits={KITS} activeKit="black-pearl" onSelectKit={onSelectKit} />
+        );
+        fireEvent.click(screen.getByRole('button', { name: /drum kit: black pearl/i }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: /red zeppelin/i }));
+        expect(onSelectKit).toHaveBeenCalledWith('red-zeppelin');
+    });
+
     it('should show pulse indicator on selected signature', () => {
         const selectedSig = COMMON_SIGNATURES.find(s => s.name === '3/4');
         const { container } = renderWithSprite(

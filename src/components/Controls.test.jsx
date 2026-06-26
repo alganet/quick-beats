@@ -158,6 +158,20 @@ describe('Controls', () => {
         expect(toggle).not.toBeInTheDocument();
     });
 
+    it('should render the drum-kit switcher with the active kit', () => {
+        const kits = {
+            'black-pearl': { name: 'Black Pearl', samples: {} },
+            'red-zeppelin': { name: 'Red Zeppelin', samples: {} },
+        };
+        renderWithSprite(
+            <Controls
+                isPlaying={false} togglePlay={vi.fn()} bpm={120} setBpm={vi.fn()}
+                kits={kits} activeKit="black-pearl" onSelectKit={vi.fn()}
+            />
+        );
+        expect(screen.getByRole('button', { name: /drum kit: black pearl/i })).toBeInTheDocument();
+    });
+
     it('should call setZoom when zoom toggle is clicked', () => {
         const togglePlay = vi.fn();
         const setBpm = vi.fn();

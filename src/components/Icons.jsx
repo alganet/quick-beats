@@ -53,6 +53,13 @@ export const IconSprite = () => (
             <path d="M2 14c0-4 10-6 10-6s10 2 10 6-10 2-10 2-10-2-10-6z" stroke="currentColor" strokeWidth="2" fill="none" />
             <circle cx="12" cy="10" r="2" fill="currentColor" />
         </symbol>
+        {/* Kit: a full drumset (two cymbals on stands over a bass drum) */}
+        <symbol id="icon-kit" viewBox="0 0 24 24">
+            <circle cx="12" cy="15" r="6" stroke="currentColor" strokeWidth="2" fill="none" />
+            <circle cx="12" cy="15" r="2" fill="currentColor" />
+            <path d="M2 7h7M15 7h7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M5.5 7v4M18.5 7v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </symbol>
 
         <symbol id="icon-follow" viewBox="0 0 24 24">
             <rect x="16" y="4" width="3" height="16" rx="1.5" fill="currentColor" />
