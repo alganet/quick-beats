@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: ISC
 
 // Minimal, dependency-free service worker for installability + offline use.
-// Bump CACHE_VERSION alongside package.json `version` to invalidate old caches.
-const CACHE_VERSION = 'v1.5.0';
+// __APP_VERSION__ is replaced with package.json `version` at build time (see
+// stampServiceWorkerVersion in vite.config.js), so each release gets a fresh
+// cache name. In dev the placeholder stays, but the SW is only registered in
+// production builds, so it never runs uncached here.
+const CACHE_VERSION = '__APP_VERSION__';
 const SHELL_CACHE = `qb-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `qb-runtime-${CACHE_VERSION}`;
 

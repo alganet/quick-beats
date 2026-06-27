@@ -7,6 +7,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import Setup from './Setup';
 import { IconSprite } from './Icons';
 import { COMMON_SIGNATURES } from '../data/signatures';
+import pkg from '../../package.json';
 
 // Wrapper to provide icon sprite
 const renderWithSprite = (ui) => {
@@ -90,7 +91,7 @@ describe('Setup', () => {
         const onShowHelp = vi.fn();
         renderWithSprite(<Setup {...defaultProps} onShowHelp={onShowHelp} />);
 
-        const versionButton = screen.getByText('v1.5.0');
+        const versionButton = screen.getByText(`v${pkg.version}`);
         fireEvent.click(versionButton);
 
         expect(onShowHelp).toHaveBeenCalledTimes(1);
