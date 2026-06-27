@@ -31,11 +31,16 @@
   --color-danger-dim: #773333;
   --color-success: #22c55e;
 
+  /* Foreground ramp tuned for WCAG contrast on dark surfaces: the original
+     muted/dim/faint (slate-500/600/700) sank to ~4.2:1, ~2.6:1 and ~1.9:1 on
+     the base #0a0a0a, leaving dim/faint text hard to read. These keep a distinct
+     strong→faint ramp while holding readable contrast (faint ~3.4:1, dim ~4.6:1;
+     muted ~4.6:1 even on the lightest surfaces). */
   --color-fg: #f8fafc;
   --color-fg-secondary: #94a3b8;
-  --color-fg-muted: #64748b;
-  --color-fg-dim: #475569;
-  --color-fg-faint: #334155;
+  --color-fg-muted: #7d8b9a;
+  --color-fg-dim: #6e7b8f;
+  --color-fg-faint: #586580;
   --color-fg-on-inverted: #000000;
 
   --color-highlight: #ffffff;
@@ -63,16 +68,21 @@
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-primary-light: #3b82f6;
-  --color-accent: #0891b2;
+  --color-accent: #0e7490;
   --color-danger: #dc2626;
   --color-danger-dim: #fecaca;
-  --color-success: #16a34a;
+  --color-success: #15803d;
 
+  /* Foreground ramp tuned for WCAG contrast on light surfaces: the original
+     dark-first values (slate-400/300) dropped to ~2.5:1 and ~1.5:1 on white,
+     leaving dim/faint text barely visible. These keep a distinct strong→faint
+     ramp while holding readable contrast (faint ~3.3:1, dim ~4.5:1 on white;
+     muted ~4.6:1 even on tinted cards). */
   --color-fg: #0f172a;
   --color-fg-secondary: #475569;
-  --color-fg-muted: #64748b;
-  --color-fg-dim: #94a3b8;
-  --color-fg-faint: #cbd5e1;
+  --color-fg-muted: #5a6878;
+  --color-fg-dim: #6b7889;
+  --color-fg-faint: #828fa0;
   --color-fg-on-inverted: #f8fafc;
 
   --color-highlight: #000000;
