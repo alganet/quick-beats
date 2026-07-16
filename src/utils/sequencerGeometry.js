@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: ISC
 
-import { ZOOM_CONFIG } from '../data/sequencerConfig';
+import { DEFAULT_ZOOM, ZOOM_CONFIG } from '../data/sequencerConfig';
 
 export const GRID_LAYOUT = {
     rowLabelClass: 'pl-1.5 w-8 md:w-10',
@@ -34,6 +34,60 @@ export function getGridOriginOffsetPx(mobile = isMobileViewport()) {
 
 function getConfig(zoom) {
     return ZOOM_CONFIG[zoom] || ZOOM_CONFIG[1];
+}
+
+/**
+ * Vertical counterparts to the width constants above. These mirror the DOM in
+ * Sequencer and MeasureControls, so they have to move together:
+ *
+ *   SequencerHeader (h-6 / md:h-8)
+ *   grid            rowCount × cellHeight
+ *   MeasureControls groupGap + its own height, only when a measure is deletable
+ *   the column's mb-4
+ *
+ * Checked against the measured scrollHeight at every zoom, viewport and measure
+ * count: header + column + bottom margin equals it exactly.
+ */
+export const ROW_LAYOUT = {
+    headerHeight: { mobile: 24, desktop: 32 },
+    // Split because both halves are rendered from here: MeasureControls sizes
+    // its bar to measureBarPx, and the border it draws above sits outside that
+    // box. Kept apart rather than summed so neither consumer has to re-derive
+    // the other's share — the sum is measureBarHeightPx below.
+    measureBarPx: 30,
+    measureBarBorderPx: 1,
+    gridBottomMarginPx: 16,
+};
+
+export const measureBarHeightPx = ROW_LAYOUT.measureBarPx + ROW_LAYOUT.measureBarBorderPx;
+
+/**
+ * Natural height of the grid at a zoom — what it wants, before any shrinking.
+ * SequencerHeader is a flex item that compresses to ~19px once the column
+ * overflows, so the real rendered height can come in under this. Reporting the
+ * un-squashed height keeps callers conservative: a zoom only "fits" if it fits
+ * without crushing the beat numbers.
+ */
+export function gridContentHeightPx({ zoom, rowCount, measureCount, mobile = isMobileViewport() }) {
+    const config = getConfig(zoom);
+    const header = mobile ? ROW_LAYOUT.headerHeight.mobile : ROW_LAYOUT.headerHeight.desktop;
+    const bar = measureCount > 1 ? config.groupGap + measureBarHeightPx : 0;
+    return header + rowCount * config.cellHeight + bar + ROW_LAYOUT.gridBottomMarginPx;
+}
+
+/**
+ * The largest zoom no bigger than `maxZoom` whose grid fits `availableHeightPx`,
+ * falling back to the smallest when nothing does.
+ *
+ * Deliberately never returns more than `maxZoom`: this exists to rescue a grid
+ * that does not fit, not to inflate one that already does. Growing the pads on a
+ * tall screen would also cost horizontal steps, which nobody asked for.
+ */
+export function fitZoom({ availableHeightPx, rowCount, measureCount, mobile, maxZoom = DEFAULT_ZOOM }) {
+    for (let zoom = maxZoom; zoom > 0; zoom--) {
+        if (gridContentHeightPx({ zoom, rowCount, measureCount, mobile }) <= availableHeightPx) return zoom;
+    }
+    return 0;
 }
 
 export function stepToX(step, grouping, zoom) {

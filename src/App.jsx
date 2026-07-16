@@ -21,6 +21,7 @@ import PortraitNudge from './components/PortraitNudge'
 import ShareModal from './components/ShareModal'
 import Help from './components/Help'
 import { IconSprite, Icon } from './components/Icons'
+import { normalizeZoom } from './data/sequencerConfig'
 import { INSTRUMENTS, KITS, DEFAULT_KIT_ID } from './data/kit'
 import { BACKBEATS } from './data/patterns'
 import { COMMON_SIGNATURES } from './data/signatures'
@@ -105,10 +106,16 @@ function App() {
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [canScroll, setCanScroll] = useState(false);
-  const [zoom, setZoom] = useState(() => {
-    const saved = localStorage.getItem('qb-zoom');
-    return saved !== null ? parseInt(saved, 10) : 1;
-  });
+  // qb-zoom means "the user picked this", not merely "this is the current zoom".
+  // Until they do, the sequencer fits the zoom to the height it has; the moment
+  // they do, that is the last word and nothing measures over it again.
+  const [zoom, setZoom] = useState(() => normalizeZoom(localStorage.getItem('qb-zoom')));
+  const [zoomChosen, setZoomChosen] = useState(() => localStorage.getItem('qb-zoom') !== null);
+
+  const chooseZoom = useCallback((updater) => {
+    setZoomChosen(true);
+    setZoom(updater);
+  }, []);
 
 
   // Persist UI preferences
@@ -116,9 +123,12 @@ function App() {
     localStorage.setItem('qb-auto-scroll', JSON.stringify(autoScroll));
   }, [autoScroll]);
 
+  // Only a deliberate choice is worth remembering. Persisting an auto-fitted
+  // zoom would make the next visit read it back as a preference and stop
+  // fitting — the feature would work exactly once.
   useEffect(() => {
-    localStorage.setItem('qb-zoom', zoom.toString());
-  }, [zoom]);
+    if (zoomChosen) localStorage.setItem('qb-zoom', zoom.toString());
+  }, [zoom, zoomChosen]);
 
   // Remember the chosen kit so it's restored on the next visit.
   useEffect(() => {
@@ -145,7 +155,7 @@ function App() {
   useKeyboardShortcuts({
     togglePlay,
     setBpmInput,
-    setZoom,
+    setZoom: chooseZoom,
     setAutoScroll,
     setIsHelpOpen,
     setIsShareOpen,
@@ -270,10 +280,14 @@ function App() {
       {/* Screen-reader announcement of transport state (visually hidden). */}
       <div className="sr-only" role="status" aria-live="polite">{isPlaying ? 'Playing' : 'Paused'}</div>
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="@container flex-none flex items-center justify-between px-2 py-1 md:px-6 md:py-3">
+        {/* short-landscape claws back vertical space where it is scarcest: a
+            sideways phone spends 28% of its height on chrome. It is emitted after
+            md:, so it wins those conflicts. Padding and the logo only — the action
+            buttons are already at the 24px minimum target size. */}
+        <header className="@container flex-none flex items-center justify-between px-2 py-1 md:px-6 md:py-3 short-landscape:py-1">
           <div className="flex items-center gap-4 min-w-0">
             <h1 className="md:text-xl font-black tracking-tighter text-fg uppercase flex items-center gap-2 select-none min-w-0">
-              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 text-primary md:mt-0.5 flex-none" />
+              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 short-landscape:w-6 short-landscape:h-6 text-primary md:mt-0.5 flex-none" />
               {/* The wordmark yields to the action row when the header is tight;
                   the logo alone still identifies the app. Dropping it is what
                   buys the space for the action row to stay expanded on a phone,
@@ -346,7 +360,7 @@ function App() {
           shareUrl={window.location.href}
         />
 
-        <div className="px-4 pt-2 md:px-6 bg-surface-6 border border-border-dim">
+        <div className="px-4 pt-2 md:px-6 short-landscape:pt-1 bg-surface-6 border border-border-dim">
           <Controls
             isPlaying={isPlaying}
             togglePlay={togglePlay}
@@ -356,7 +370,7 @@ function App() {
             setAutoScroll={setAutoScroll}
             canScroll={canScroll}
             zoom={zoom}
-            setZoom={setZoom}
+            setZoom={chooseZoom}
             humanizeStatus={humanizeStatus}
             humanizeProgress={modelProgress}
             onHumanize={humanizeAction}
@@ -386,6 +400,8 @@ function App() {
           autoScroll={autoScroll}
           setAutoScroll={setAutoScroll}
           setCanScroll={setCanScroll}
+          fitZoomToHeight={!zoomChosen}
+          onFitZoom={setZoom}
           zoom={zoom}
         />
 

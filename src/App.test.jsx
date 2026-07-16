@@ -700,7 +700,51 @@ describe('App', () => {
          mockUseAudio.isLoaded = true;
          render(<App />);
          expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-auto-scroll', 'true');
-         expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-zoom', '1');
+    });
+
+    it('does not record a zoom preference the user never expressed', () => {
+        // qb-zoom is the user's choice, not the current zoom. Writing it on mount
+        // would make the next visit read it back as a preference and stop fitting
+        // the grid to the viewport — auto-fit would work exactly once.
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        expect(localStorageMock.setItem).not.toHaveBeenCalledWith('qb-zoom', expect.anything());
+    });
+
+    it('records the zoom once the user changes it', () => {
+        vi.useFakeTimers();
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // The z shortcut is debounced.
+        fireEvent.keyDown(window, { key: 'z' });
+        act(() => { vi.advanceTimersByTime(210); });
+
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-zoom', '2');
+        vi.useRealTimers();
+    });
+
+    it('heals a stored zoom this build cannot render', () => {
+        // Components index ZOOM_CONFIG raw, so a level we never wrote — a stale
+        // one from a build with more zooms, or a hand-edited key — used to reach
+        // them as undefined and blank the app, with no way back short of
+        // clearing site data. Persisting '1' is what proves the bad value was
+        // normalized on the way in rather than carried into state.
+        localStorageMock.setItem('qb-zoom', '99');
+        localStorageMock.setItem.mockClear();
+        mockUseAudio.isLoaded = true;
+
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-zoom', '1');
     });
 
     it('closes modals when pressing Escape', () => {

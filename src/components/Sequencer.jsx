@@ -9,6 +9,7 @@ import { Icon } from "./Icons";
 import ContextMenu from "./ContextMenu";
 import { useSequencerSelection } from "../hooks/useSequencerSelection";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { useFitZoom } from "../hooks/useFitZoom";
 import { useInputModality } from "../hooks/useInputModality";
 import { SequencerHeader } from "./SequencerHeader";
 import { MemoizedInstrumentRow } from "./InstrumentRow";
@@ -19,7 +20,7 @@ import { getGridOriginOffsetPx, isMobileViewport, scrollTargetForStep, xToStep }
 
 
 
-export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, toggleStep, bulkUpdateStep, currentStep, stepCount = 16, setStep, addMeasure, removeMeasure, beatsPerMeasure = 4, stepsPerBeat = 4, grouping = 4, autoScroll, setAutoScroll, setCanScroll, zoom }) {
+export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, toggleStep, bulkUpdateStep, currentStep, stepCount = 16, setStep, addMeasure, removeMeasure, beatsPerMeasure = 4, stepsPerBeat = 4, grouping = 4, autoScroll, setAutoScroll, setCanScroll, zoom, fitZoomToHeight = false, onFitZoom }) {
     const scrollContainerRef = useRef(null);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [gridOriginOffset, setGridOriginOffset] = useState(getGridOriginOffsetPx(isMobileViewport()));
@@ -48,7 +49,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
     const { menuState, setMenuState, menuRef } = useSequencerSelection({ onBulkUpdate: bulkUpdateStep });
     
     // Auto-scroll hook
-    const { playheadOffRight, playheadOffLeft, handleManualScroll } = useAutoScroll({
+    const { playheadOffRight, playheadOffLeft, handleWheel, handleTouchStart, handleTouchMove } = useAutoScroll({
         scrollContainerRef,
         currentStep,
         stepCount,
@@ -62,6 +63,15 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
 
     const stepsPerMeasure = beatsPerMeasure * stepsPerBeat;
     const measureCount = Math.floor(stepCount / stepsPerMeasure);
+
+    // Sizes the grid to the height it has, until the user picks a zoom themselves.
+    useFitZoom({
+        scrollContainerRef,
+        enabled: fitZoomToHeight,
+        rowCount: INSTRUMENTS.length,
+        measureCount,
+        onFit: onFitZoom,
+    });
 
     const updateGeometryAndRange = useCallback(() => {
         const container = scrollContainerRef.current;
@@ -304,10 +314,11 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
             )}
             <div
                 ref={scrollContainerRef}
-                className="relative flex-1 overflow-x-auto overflow-y"
+                className="relative flex-1 overflow-x-auto overflow-y-auto"
                 data-sequencer-scroll-container="true"
-                onWheel={handleManualScroll}
-                onTouchMove={handleManualScroll}
+                onWheel={handleWheel}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
             >
                 <div style={{ width: 'max-content', minWidth: '100%', height: '100%', display: 'flex', flexDirection: 'row' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>

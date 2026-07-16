@@ -54,7 +54,7 @@ export default function Controls({
     const clampBpm = useCallback((value) => Math.max(60, Math.min(240, value)), []);
 
     return (
-        <div className="flex flex-row items-center gap-0 mb-2 p-0">
+        <div className="flex flex-row items-center gap-0 mb-2 p-0 short-landscape:mb-1">
             {/* Buttons Group: Left */}
             <div className="flex items-center gap-3 mr-2">
                 {/* Play/Stop Button */}

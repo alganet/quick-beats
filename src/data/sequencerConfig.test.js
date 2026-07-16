@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { describe, it, expect } from 'vitest';
-import { ZOOM_CONFIG, INSTRUMENT_ICONS } from './sequencerConfig';
+import { ZOOM_CONFIG, INSTRUMENT_ICONS, DEFAULT_ZOOM, normalizeZoom } from './sequencerConfig';
 
 describe('sequencerConfig', () => {
     describe('ZOOM_CONFIG', () => {
@@ -70,6 +70,44 @@ describe('sequencerConfig', () => {
                 expect(config).toHaveProperty('gapClass');
                 expect(config).toHaveProperty('groupGapClass');
                 expect(config).toHaveProperty('radiusClass');
+            });
+        });
+    });
+
+    describe('normalizeZoom', () => {
+        // Several components index ZOOM_CONFIG raw and read a field straight off
+        // the result (InstrumentRow, MeasureControls, Sequencer's add-measure
+        // button), so anything that reaches state unrecognised is a blank screen
+        // rather than a wrong size. Everything below arrives as a localStorage
+        // string, which is the only way a foreign value gets in.
+        it('passes through every zoom this build renders', () => {
+            expect(normalizeZoom('0')).toBe(0);
+            expect(normalizeZoom('1')).toBe(1);
+            expect(normalizeZoom('2')).toBe(2);
+        });
+
+        it('accepts numbers as well as stored strings', () => {
+            expect(normalizeZoom(0)).toBe(0);
+            expect(normalizeZoom(2)).toBe(2);
+        });
+
+        it('falls back for a level this build no longer has', () => {
+            // A visitor who used a build with more zoom levels still has its
+            // value in localStorage.
+            expect(normalizeZoom('3')).toBe(DEFAULT_ZOOM);
+            expect(normalizeZoom('-1')).toBe(DEFAULT_ZOOM);
+        });
+
+        it('falls back for a value that is not a zoom at all', () => {
+            expect(normalizeZoom(null)).toBe(DEFAULT_ZOOM);
+            expect(normalizeZoom('')).toBe(DEFAULT_ZOOM);
+            expect(normalizeZoom('banana')).toBe(DEFAULT_ZOOM);
+            expect(normalizeZoom(undefined)).toBe(DEFAULT_ZOOM);
+        });
+
+        it('never returns a level with no config behind it', () => {
+            ['0', '1', '2', '3', 'banana', null, ''].forEach((stored) => {
+                expect(ZOOM_CONFIG[normalizeZoom(stored)]).toBeDefined();
             });
         });
     });

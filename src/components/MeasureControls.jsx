@@ -4,7 +4,7 @@
 
 
 import { ZOOM_CONFIG } from '../data/sequencerConfig';
-import { measureWidth } from '../utils/sequencerGeometry';
+import { measureWidth, ROW_LAYOUT } from '../utils/sequencerGeometry';
 import ConfirmBar from './ConfirmBar';
 
 const getHorizontalScrollContainer = (element) => {
@@ -58,7 +58,20 @@ export function MeasureControls({
     if (measureCount <= 1) return null;
 
     return (
-        <div className={`flex items-stretch z-30`} style={{ marginTop: `${config.groupGap}px` }}>
+        // Pinned to the floor of the grid viewport: a landscape phone cannot show
+        // the whole grid, and as the last row of the column this bar was the first
+        // thing to fall off the bottom — taking measure deletion with it. Sticky
+        // keeps it scrolling horizontally with the measures, which it must to stay
+        // aligned to them. It needs its own background because only the measure
+        // buttons carry one, so rows would otherwise show through the gaps once it
+        // floats over them. bottom-0 rather than matching the column's mb-4: any
+        // offset leaves a band below the bar for rows to scroll through in plain
+        // sight. Sticky never pushes past the natural position, so over the last
+        // 16px of travel the bar just rides the content up off the floor.
+        <div
+            className={`sticky bottom-0 flex items-stretch z-30 bg-surface-1 border-t border-border-dim`}
+            style={{ marginTop: `${config.groupGap}px` }}
+        >
 
             {/* Sticky Spacer matching instrument label */}
             <div className="sticky left-0 flex-shrink-0 z-0" style={{ width: `${gridOriginOffset ?? 48}px` }} />
@@ -78,7 +91,7 @@ export function MeasureControls({
                                 }
                             `}
                             style={{
-                                height: 30,
+                                height: ROW_LAYOUT.measureBarPx,
                                 width: `${width}px`,
                                 marginRight: `${config.groupGap}px`
                             }}

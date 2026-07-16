@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: ISC
 
+// The zoom a fresh visitor lands on, and the ceiling auto-fit will pick up to.
+export const DEFAULT_ZOOM = 1;
+
 export const ZOOM_CONFIG = {
     0: { // Small
         cellWidth: 20, // w-5
@@ -37,6 +40,20 @@ export const ZOOM_CONFIG = {
         radiusClass: 'rounded-md'
     }
 };
+
+/**
+ * Coerce a persisted or foreign zoom into one this build actually renders.
+ *
+ * Several call sites index ZOOM_CONFIG raw and read a field straight off the
+ * result, so a value we never wrote — a stale level from a build with more
+ * zooms, or a hand-edited key — would otherwise blank the app with no way back
+ * short of clearing site data. Anything unrecognised becomes the default, which
+ * the persist effect then writes back over the bad value.
+ */
+export function normalizeZoom(value) {
+    const zoom = typeof value === 'number' ? value : parseInt(value, 10);
+    return ZOOM_CONFIG[zoom] ? zoom : DEFAULT_ZOOM;
+}
 
 // Bulk-fill modes, in menu order. Single source of truth shared by the menu
 // render (ContextMenu) and the keyboard cycling (useSequencerSelection).

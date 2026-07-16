@@ -121,7 +121,9 @@ describe('Sequencer', () => {
         mockUseAutoScroll.mockReturnValue({
             playheadOffRight: false,
             playheadOffLeft: false,
-            handleManualScroll: vi.fn()
+            handleWheel: vi.fn(),
+            handleTouchStart: vi.fn(),
+            handleTouchMove: vi.fn()
         });
     });
 
@@ -191,7 +193,9 @@ describe('Sequencer', () => {
         mockUseAutoScroll.mockReturnValue({
             playheadOffRight: true,
             playheadOffLeft: false,
-            handleManualScroll: vi.fn()
+            handleWheel: vi.fn(),
+            handleTouchStart: vi.fn(),
+            handleTouchMove: vi.fn()
         });
 
         // rerender to pick up new hook return value
@@ -307,13 +311,16 @@ describe('Sequencer', () => {
         expect(mockSetMenuState).not.toHaveBeenCalled();
     });
 
-    it('handles wheel event for manual scroll', () => {
-        // prepare a spy for handleManualScroll
-        const manualScrollSpy = vi.fn();
+    it('routes scroll gestures to the hook, which decides on their axis', () => {
+        const wheelSpy = vi.fn();
+        const touchStartSpy = vi.fn();
+        const touchMoveSpy = vi.fn();
         mockUseAutoScroll.mockReturnValue({
             playheadOffRight: false,
             playheadOffLeft: false,
-            handleManualScroll: manualScrollSpy
+            handleWheel: wheelSpy,
+            handleTouchStart: touchStartSpy,
+            handleTouchMove: touchMoveSpy
         });
 
         render(<Sequencer {...defaultProps} />);
@@ -321,7 +328,13 @@ describe('Sequencer', () => {
         expect(scrollContainer).not.toBeNull();
 
         fireEvent.wheel(scrollContainer);
-        expect(manualScrollSpy).toHaveBeenCalled();
+        expect(wheelSpy).toHaveBeenCalled();
+
+        // touchStart must be wired too, or touchMove has no origin to compare against
+        fireEvent.touchStart(scrollContainer, { touches: [{ clientX: 0, clientY: 0 }] });
+        fireEvent.touchMove(scrollContainer, { touches: [{ clientX: 10, clientY: 0 }] });
+        expect(touchStartSpy).toHaveBeenCalled();
+        expect(touchMoveSpy).toHaveBeenCalled();
     });
 });
 

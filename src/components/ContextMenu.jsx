@@ -5,30 +5,46 @@
 import { useRef, useLayoutEffect, useState, useImperativeHandle, forwardRef, Fragment } from 'react';
 import { FILL_MODES } from '../data/sequencerConfig';
 
+// Lifted above the touch point so a finger does not cover it.
+const FINGER_CLEARANCE_PX = 130;
+const EDGE_PADDING_PX = 12;
+
 const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, ref) => {
     const [offset, setOffset] = useState(0);
+    const [yOffset, setYOffset] = useState(0);
     const menuRef = useRef(null);
 
     useImperativeHandle(ref, () => menuRef.current);
 
     useLayoutEffect(() => {
-        if (menuRef.current) {
-            const rect = menuRef.current.getBoundingClientRect();
-            const padding = 12;
-            let newOffset = 0;
+        if (!menuRef.current) return;
+        // Clamp from the requested anchor and the menu's own size, not from its
+        // measured position: the rect already carries whatever offset the last
+        // run applied, so measuring it compounds rather than settles.
+        const { width, height } = menuRef.current.getBoundingClientRect();
 
-            if (rect.left < padding) {
-                newOffset = padding - rect.left;
-            } else if (rect.right > window.innerWidth - padding) {
-                newOffset = window.innerWidth - padding - rect.right;
-            }
-
-            if (newOffset !== 0) {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
-                setOffset(newOffset);
-            }
+        const naturalLeft = x - width / 2; // the box is translateX(-50%)
+        let dx = 0;
+        if (naturalLeft < EDGE_PADDING_PX) {
+            dx = EDGE_PADDING_PX - naturalLeft;
+        } else if (naturalLeft + width > window.innerWidth - EDGE_PADDING_PX) {
+            dx = window.innerWidth - EDGE_PADDING_PX - (naturalLeft + width);
         }
-    }, [x]);
+
+        // The vertical twin the horizontal clamp never had. Without it the finger
+        // clearance pushes the menu off the top of the screen for the first
+        // instrument row on a short viewport, with nothing to recover it.
+        const naturalTop = y - FINGER_CLEARANCE_PX;
+        let dy = 0;
+        if (naturalTop < EDGE_PADDING_PX) {
+            dy = EDGE_PADDING_PX - naturalTop;
+        } else if (naturalTop + height > window.innerHeight - EDGE_PADDING_PX) {
+            dy = window.innerHeight - EDGE_PADDING_PX - (naturalTop + height);
+        }
+
+        setOffset(dx);
+        setYOffset(dy);
+    }, [x, y]);
 
     // Metadata per fill mode, keyed by id (built once). The `pattern` previews
     // which cells the mode fills/clears within two groups.
@@ -62,7 +78,7 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
             className="fixed z-[100] bg-surface-3 border border-border-default shadow-2xl rounded-lg overflow-hidden pointer-events-none"
             style={{
                 left: x + offset,
-                top: y - 130, // Higher to clear the finger
+                top: y - FINGER_CLEARANCE_PX + yOffset,
                 transform: 'translateX(-50%)'
             }}
         >
@@ -111,14 +127,21 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
                     </div>
                 ))}
             </div>
-            {/* Arrow down - adjusted to point to the pad even when menu is offset */}
-            <div
-                className="absolute -bottom-1 w-2 h-2 bg-surface-3 border-r border-b border-border-default rotate-45"
-                style={{
-                    left: `calc(50% - ${offset}px)`,
-                    marginLeft: '-4px'
-                }}
-            />
+            {/* Arrow down - adjusted to point to the pad even when menu is offset.
+                A horizontal offset it can follow, by walking back along the edge
+                it already sits on. A vertical one it cannot: the clamp moves the
+                menu off its anchor entirely, and an arrow on the bottom edge
+                would then point at whatever the menu had been lifted over. Drop
+                it rather than let it lie about where the pad is. */}
+            {yOffset === 0 && (
+                <div
+                    className="absolute -bottom-1 w-2 h-2 bg-surface-3 border-r border-b border-border-default rotate-45"
+                    style={{
+                        left: `calc(50% - ${offset}px)`,
+                        marginLeft: '-4px'
+                    }}
+                />
+            )}
         </div>
     );
 });

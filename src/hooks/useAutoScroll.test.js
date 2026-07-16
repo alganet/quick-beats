@@ -25,6 +25,11 @@ describe('useAutoScroll', () => {
                 clientWidth: 800,
                 scrollLeft: 0,
                 scrollWidth: 2000,
+                // Taller content than viewport: the grid overflows vertically,
+                // so a vertical wheel has somewhere of its own to go. Tests that
+                // care about the desktop case override these.
+                clientHeight: 300,
+                scrollHeight: 400,
                 scrollTo: vi.fn(),
                 querySelector: vi.fn().mockImplementation((sel) => {
                     if (sel === '.sticky') return { offsetWidth: 64 };
@@ -133,35 +138,83 @@ describe('useAutoScroll', () => {
         expect(scrollContainerRef.current.scrollTo).not.toHaveBeenCalled();
     });
 
-    it('disables autoScroll when user manually scrolls', () => {
-        const { result } = renderHook(() => useAutoScroll({
-            scrollContainerRef,
-            currentStep: 0,
-            stepCount: 16,
-            grouping: 4,
-            autoScroll: true,
-            setAutoScroll,
-            setCanScroll,
-            zoom: 1
-        }));
+    const withAutoScroll = (autoScroll = true) => renderHook(() => useAutoScroll({
+        scrollContainerRef,
+        currentStep: 0,
+        stepCount: 16,
+        grouping: 4,
+        autoScroll,
+        setAutoScroll,
+        setCanScroll,
+        zoom: 1
+    }));
 
-        result.current.handleManualScroll();
+    it('disables autoScroll when the user takes over the horizontal scroll', () => {
+        const { result } = withAutoScroll();
+
+        result.current.handleWheel({ deltaX: -40, deltaY: 0 });
         expect(setAutoScroll).toHaveBeenCalledWith(false);
     });
 
-    it('does not disable autoScroll on manual scroll when already disabled', () => {
-        const { result } = renderHook(() => useAutoScroll({
-            scrollContainerRef,
-            currentStep: 0,
-            stepCount: 16,
-            grouping: 4,
-            autoScroll: false,
-            setAutoScroll,
-            setCanScroll,
-            zoom: 1
-        }));
+    it('keeps following when the user scrolls vertically', () => {
+        // The grid scrolls both axes from one element, so a scroll down to reach
+        // the lower rows or the delete bar must not read as "stop following".
+        const { result } = withAutoScroll();
 
-        result.current.handleManualScroll();
+        result.current.handleWheel({ deltaX: 0, deltaY: 60 });
+        expect(setAutoScroll).not.toHaveBeenCalled();
+    });
+
+    it('treats a vertical wheel as horizontal intent when nothing can scroll vertically', () => {
+        // The desktop case: the grid fits vertically, so the browser spends a
+        // plain mouse wheel's deltaY on scrollLeft. Trusting the label here
+        // would leave the follow fighting the wheel that is moving the grid.
+        scrollContainerRef.current.scrollHeight = 300;
+        scrollContainerRef.current.clientHeight = 300;
+        const { result } = withAutoScroll();
+
+        result.current.handleWheel({ deltaX: 0, deltaY: 60 });
+        expect(setAutoScroll).toHaveBeenCalledWith(false);
+    });
+
+    it('disables autoScroll on a horizontal drag', () => {
+        const { result } = withAutoScroll();
+
+        result.current.handleTouchStart({ touches: [{ clientX: 200, clientY: 100 }] });
+        result.current.handleTouchMove({ touches: [{ clientX: 140, clientY: 108 }] });
+        expect(setAutoScroll).toHaveBeenCalledWith(false);
+    });
+
+    it('keeps following through a vertical drag', () => {
+        const { result } = withAutoScroll();
+
+        result.current.handleTouchStart({ touches: [{ clientX: 200, clientY: 100 }] });
+        result.current.handleTouchMove({ touches: [{ clientX: 206, clientY: 180 }] });
+        expect(setAutoScroll).not.toHaveBeenCalled();
+    });
+
+    it('keeps following through the jitter of a stationary tap', () => {
+        // A finger rolls a couple of pixels between touchstart and touchmove.
+        // That is a tap on a pad, not a decision to stop following — even though
+        // its 2px of x beats its 1px of y.
+        const { result } = withAutoScroll();
+
+        result.current.handleTouchStart({ touches: [{ clientX: 200, clientY: 100 }] });
+        result.current.handleTouchMove({ touches: [{ clientX: 202, clientY: 101 }] });
+        expect(setAutoScroll).not.toHaveBeenCalled();
+    });
+
+    it('ignores a touch move with no recorded origin', () => {
+        const { result } = withAutoScroll();
+
+        expect(() => result.current.handleTouchMove({ touches: [{ clientX: 10, clientY: 10 }] })).not.toThrow();
+        expect(setAutoScroll).not.toHaveBeenCalled();
+    });
+
+    it('does not disable autoScroll when it is already off', () => {
+        const { result } = withAutoScroll(false);
+
+        result.current.handleWheel({ deltaX: -40, deltaY: 0 });
         expect(setAutoScroll).not.toHaveBeenCalled();
     });
 
