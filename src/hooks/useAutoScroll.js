@@ -25,19 +25,32 @@ export function useAutoScroll({
         containerWidth: 0,
     });
     const lastScrollTargetRef = useRef(null);
+    const [measureTick, setMeasureTick] = useState(0);
 
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return;
 
         const measure = () => {
-            metricsRef.current = {
+            const prev = metricsRef.current;
+            const next = {
                 gridOriginOffset: gridOriginOffset ?? 48,
                 containerWidth: container.clientWidth,
             };
+            metricsRef.current = next;
 
             const hasScroll = container.scrollWidth > container.clientWidth;
             setCanScroll(hasScroll);
+
+            // The off-screen effect below reads these metrics through a ref, so
+            // it needs an explicit nudge to recompute when they change —
+            // otherwise the playhead indicators keep the values measured before
+            // the last resize, which a device rotation makes very visible.
+            // Only bump on a real change; a ResizeObserver fires continuously
+            // through a drag.
+            if (prev.containerWidth !== next.containerWidth || prev.gridOriginOffset !== next.gridOriginOffset) {
+                setMeasureTick(t => t + 1);
+            }
         };
 
         const observer = new ResizeObserver(measure);
@@ -94,7 +107,7 @@ export function useAutoScroll({
                 container.scrollTo({ left: clampedTarget, behavior: 'auto' });
             }
         }
-    }, [currentStep, grouping, autoScroll, zoom, scrollContainerRef]);
+    }, [currentStep, grouping, autoScroll, zoom, scrollContainerRef, measureTick]);
 
     const handleManualScroll = useCallback(() => {
         if (autoScroll) setAutoScroll(false);
