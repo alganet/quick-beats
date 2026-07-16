@@ -121,7 +121,7 @@ export default function Controls({
                     title={`Change Zoom Level [z]`}
                     aria-label="Toggle Zoom"
                 >
-                    <Icon id={`zoom-${zoom}`} className="w-5 h-5" />
+                    <Icon id={`zoom-${zoom}`} className="w-4 h-4" />
                 </button>
                 {/* Auto-scroll Toggle - Only visible when scrolling is possible */}
                 {canScroll && isPlaying && (
