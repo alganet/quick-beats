@@ -156,6 +156,56 @@ describe('App', () => {
         expect(mockUseAudio.updateGrid).toHaveBeenCalledWith(grid);
     });
 
+    it('opens a beat whose hash arrives after load, from the setup screen', () => {
+        // An installed PWA is never re-loaded by a tapped share link: the running
+        // document just gets a new fragment. Cold-load parsing alone leaves the
+        // user staring at the setup screen with the shared beat dropped.
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: 16 }, () => false));
+        grid[0][4] = true;
+
+        act(() => {
+            window.location.hash = `#132|4/4|black-pearl|${encodeGrid(grid)}|v1`;
+            window.dispatchEvent(new Event('hashchange'));
+        });
+
+        expect(screen.queryByTestId('mock-setup')).not.toBeInTheDocument();
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+        expect(mockUseAudio.updateGrid).toHaveBeenCalledWith(grid);
+    });
+
+    it('replaces the beat already on screen when a shared hash arrives', () => {
+        renderWith44();
+
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: 12 }, () => false));
+        grid[1][2] = true;
+
+        act(() => {
+            window.location.hash = `#90|3/4|black-pearl|${encodeGrid(grid)}|v1`;
+            window.dispatchEvent(new Event('hashchange'));
+        });
+
+        expect(mockUseAudio.updateGrid).toHaveBeenCalledWith(grid);
+        // The incoming grid is shorter than the one playing, so the playhead has
+        // to be brought back to a step that still exists.
+        expect(mockUseAudio.setStep).toHaveBeenCalledWith(0);
+    });
+
+    it('keeps the current beat when the hash changes to something unreadable', () => {
+        renderWith44();
+        mockUseAudio.updateGrid.mockClear();
+
+        act(() => {
+            window.location.hash = '#not-a-beat';
+            window.dispatchEvent(new Event('hashchange'));
+        });
+
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+        expect(mockUseAudio.updateGrid).not.toHaveBeenCalled();
+    });
+
     const renderWith44 = () => {
         const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: 16 }, () => false));
         window.location.hash = `#120|4/4|black-pearl|${encodeGrid(grid)}|v1`;

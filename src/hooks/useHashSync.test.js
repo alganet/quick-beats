@@ -94,4 +94,56 @@ describe('useHashSync', () => {
         vi.advanceTimersByTime(HASH_SYNC_DELAY_MS);
         expect(replaceStateSpy).not.toHaveBeenCalled();
     });
+
+    describe('external hash changes', () => {
+        // An installed PWA hands a tapped share link to the running document as a
+        // fragment change, so this is the only signal that a new beat arrived.
+        const setHashAndFire = (hash) => {
+            window.location.hash = hash;
+            window.dispatchEvent(new Event('hashchange'));
+        };
+
+        it('reports a hash the app did not write', () => {
+            const onExternalHash = vi.fn();
+            renderHook((props) => useHashSync(props), { initialProps: { ...baseProps, onExternalHash } });
+
+            setHashAndFire('#140|3/4|red-zeppelin|12.AAAA');
+
+            expect(onExternalHash).toHaveBeenCalledWith('140|3/4|red-zeppelin|12.AAAA');
+        });
+
+        it('ignores the hash it just wrote itself', () => {
+            const onExternalHash = vi.fn();
+            renderHook((props) => useHashSync(props), { initialProps: { ...baseProps, onExternalHash } });
+            vi.advanceTimersByTime(HASH_SYNC_DELAY_MS);
+            const [, , written] = replaceStateSpy.mock.calls[0];
+
+            // replaceState is spied out, so put the hash in place by hand the way a
+            // real write would have, then let the event land on the listener.
+            onExternalHash.mockClear();
+            setHashAndFire(written);
+
+            expect(onExternalHash).not.toHaveBeenCalled();
+        });
+
+        it('reports each distinct hash once', () => {
+            const onExternalHash = vi.fn();
+            renderHook((props) => useHashSync(props), { initialProps: { ...baseProps, onExternalHash } });
+
+            setHashAndFire('#140|3/4|red-zeppelin|12.AAAA');
+            setHashAndFire('#140|3/4|red-zeppelin|12.AAAA');
+
+            expect(onExternalHash).toHaveBeenCalledTimes(1);
+        });
+
+        it('stops listening on unmount', () => {
+            const onExternalHash = vi.fn();
+            const { unmount } = renderHook((props) => useHashSync(props), { initialProps: { ...baseProps, onExternalHash } });
+            unmount();
+
+            setHashAndFire('#140|3/4|red-zeppelin|12.AAAA');
+
+            expect(onExternalHash).not.toHaveBeenCalled();
+        });
+    });
 });

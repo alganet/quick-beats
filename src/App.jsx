@@ -162,8 +162,28 @@ function App() {
     humanizeAction,
   });
 
+  // Adopt a beat that arrives in the URL after load — an installed PWA gets a
+  // tapped share link as a fragment change on the running document, not as a
+  // fresh page load, so the hash has to be applied to live state here rather
+  // than seeding it at mount. An unparseable hash is left alone: whatever is on
+  // screen is worth more than a link we can't read.
+  const handleExternalHash = useCallback((hash) => {
+    const shared = parseInitialHash(hash, INSTRUMENTS.length, COMMON_SIGNATURES);
+    if (!shared) return;
+
+    setBpmInput(shared.bpm);
+    setTimeSignature(shared.sig);
+    setPreviewSig(shared.sig);
+    setGrid(shared.grid);
+    // The incoming grid can be a different length than the one playing, so the
+    // playhead has to come back to a step that certainly exists.
+    setStep(0);
+    setIsSetup(true);
+    handleSelectKit(shared.kitId);
+  }, [setStep, handleSelectKit]);
+
   // Keep the URL hash in sync with the live pattern (debounced).
-  useHashSync({ isSetup, timeSignature, grid, bpmInput, activeKit });
+  useHashSync({ isSetup, timeSignature, grid, bpmInput, activeKit, onExternalHash: handleExternalHash });
 
   // Sync BPM to audio engine on a short delay so UI can update instantly while
   // avoiding excessive tempo updates during rapid user input.
