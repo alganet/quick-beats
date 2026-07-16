@@ -19,8 +19,17 @@ import { useDismiss } from "../hooks/useDismiss";
  *   switchingTo - id of a kit being loaded (null when idle)
  *   progress    - 0..1 download progress for the in-flight switch
  *   onSelectKit - (kitId) => void; requests a switch
+ *   menuClassName  - horizontal anchoring for the popover. The default hangs it
+ *                    off the button's right edge, which is what fits when the
+ *                    button sits centred or near the right of its container.
+ *                    Callers that place the button hard against the left edge
+ *                    must flip it, or the 12rem popover opens off-screen.
+ *   arrowClassName - anchoring for the little pointer; keep it on the same side.
  */
-export default function DrumKitButton({ kits = {}, activeKit, switchingTo, progress = 0, onSelectKit }) {
+export default function DrumKitButton({
+    kits = {}, activeKit, switchingTo, progress = 0, onSelectKit,
+    menuClassName = "right-0", arrowClassName = "right-3",
+}) {
     const [open, setOpen] = useState(false);
     const wrapperRef = useRef(null);
     const switching = Boolean(switchingTo);
@@ -52,9 +61,9 @@ export default function DrumKitButton({ kits = {}, activeKit, switchingTo, progr
             {open && (
                 <div
                     role="menu"
-                    className="absolute top-full right-0 mt-2 w-48 z-[100] bg-surface-3 border border-border-default rounded-sm p-1 text-xs text-fg-secondary shadow-lg animate-in fade-in duration-150"
+                    className={`absolute top-full ${menuClassName} mt-2 w-48 z-[100] bg-surface-3 border border-border-default rounded-sm p-1 text-xs text-fg-secondary shadow-lg animate-in fade-in duration-150`}
                 >
-                    <div className="absolute -top-1 right-3 w-2 h-2 bg-surface-3 border-l border-t border-border-default rotate-45" />
+                    <div className={`absolute -top-1 ${arrowClassName} w-2 h-2 bg-surface-3 border-l border-t border-border-default rotate-45`} />
                     <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-fg-muted">Drum sounds</div>
                     {Object.entries(kits).map(([id, kit]) => {
                         const isActive = id === activeKit;

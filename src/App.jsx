@@ -10,10 +10,14 @@ import { useSamplePreload } from './hooks/useSamplePreload'
 import { useHashSync } from './hooks/useHashSync'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useHumanizeLifecycle } from './hooks/useHumanizeLifecycle'
+import { useLandscapeLock } from './hooks/useLandscapeLock'
+import { useMediaQuery } from './hooks/useMediaQuery'
+import { usePortraitNudge } from './hooks/usePortraitNudge'
 import Sequencer from './components/Sequencer'
 import Controls from './components/Controls'
 import Setup from './components/Setup'
 import LoadingScreen from './components/LoadingScreen'
+import PortraitNudge from './components/PortraitNudge'
 import ShareModal from './components/ShareModal'
 import Help from './components/Help'
 import { IconSprite, Icon } from './components/Icons'
@@ -31,8 +35,22 @@ import {
 
 const ACTION_DELAY_MS = 200;
 
+// One shape for every header action, so the row stays optically even whether a
+// button carries an icon, a label, or both — mixing per-button padding is what
+// makes their heights and centres disagree. h-6 is also the WCAG 2.5.8 minimum
+// target size, which per-button padding alone did not reach.
+const HEADER_ACTION_CLASS =
+  'h-6 px-2 flex-none flex items-center gap-2 border border-border-default ' +
+  'text-[10px] font-bold font-mono uppercase tracking-tighter ' +
+  'text-fg-muted hover:text-fg transition-colors';
+
 function App() {
   const [theme, , toggleTheme] = useTheme();
+
+  // Owned here rather than inside each consumer so the header button and the
+  // portrait nudge share one set of media/fullscreen listeners and can't disagree.
+  const rotate = useLandscapeLock();
+  const portraitNudge = usePortraitNudge();
 
   const _initialHash = typeof window !== 'undefined'
     ? parseInitialHash(window.location.hash.substring(1), INSTRUMENTS.length, COMMON_SIGNATURES)
@@ -78,8 +96,6 @@ function App() {
   const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
   const [timeSignature, setTimeSignature] = useState(_initialHash?.sig ?? null);
   const [previewSig, setPreviewSig] = useState(_initialHash?.sig ?? null);
   const [bpmInput, setBpmInput] = useState(_initialHash?.bpm ?? 120);
@@ -94,17 +110,6 @@ function App() {
     return saved !== null ? parseInt(saved, 10) : 1;
   });
 
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [menuOpen]);
 
   // Persist UI preferences
   useEffect(() => {
@@ -120,25 +125,8 @@ function App() {
     localStorage.setItem('qb-kit', activeKit);
   }, [activeKit]);
 
-  // Global keyboard shortcuts
-  const [showKeyboardCheatsheet, setShowKeyboardCheatsheet] = useState(() => {
-    try {
-      return typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)')?.matches;
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    // update when pointer precision media query changes
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-      const mq = window.matchMedia('(pointer: fine)');
-      const handler = (ev) => setShowKeyboardCheatsheet(ev.matches);
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
-    }
-    return undefined;
-  }, []);
+  // Global keyboard shortcuts — the cheatsheet only helps where there's a keyboard.
+  const showKeyboardCheatsheet = useMediaQuery('(pointer: fine)');
 
   // Humanize intent layer: on/off toggle, streamed-layer application, idle
   // re-humanize, BPM rescale, signature-change reset, and derived button status.
@@ -271,72 +259,78 @@ function App() {
           switchingKit={switchingKit}
           kitProgress={kitProgress}
           onSelectKit={handleSelectKit}
-          className="min-h-full"
         />
       </>
     );
   }
 
   return (
-    <div className="bg-surface-1 h-screen flex flex-col text-fg overflow-hidden w-fit max-w-screen min-w-[360px]">
+    <div className="bg-surface-1 h-dvh safe-inset flex flex-col text-fg overflow-hidden w-fit max-w-screen min-w-[360px]">
       <IconSprite />
       {/* Screen-reader announcement of transport state (visually hidden). */}
       <div className="sr-only" role="status" aria-live="polite">{isPlaying ? 'Playing' : 'Paused'}</div>
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="@container flex-none flex items-center justify-between px-2 py-1 md:px-6 md:py-3">
-          <div className="flex items-center gap-4">
-            <h1 className="text-md md:text-xl font-black tracking-tighter text-fg uppercase flex items-center gap-2 select-none">
-              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 text-primary md:mt-0.5" />
-              Quick Beats
+          <div className="flex items-center gap-4 min-w-0">
+            <h1 className="md:text-xl font-black tracking-tighter text-fg uppercase flex items-center gap-2 select-none min-w-0">
+              <Icon id="logo" className="w-6 h-6 md:w-7 md:h-7 text-primary md:mt-0.5 flex-none" />
+              {/* The wordmark yields to the action row when the header is tight;
+                  the logo alone still identifies the app. Dropping it is what
+                  buys the space for the action row to stay expanded on a phone,
+                  rather than collapsing to a hamburger. */}
+              <span className="hidden @min-[600px]:inline truncate">Quick Beats</span>
             </h1>
           </div>
 
-          <div className="relative" ref={menuRef}>
-            {/* Hamburger trigger — hidden when container is wide enough */}
-            <button
-              onClick={() => setMenuOpen(o => !o)}
-              className="text-fg-muted hover:text-fg transition-colors border border-border-default p-1.5 @min-[500px]:hidden"
-              title="Menu"
-            >
-              <Icon id="menu" className="w-4 h-4" />
-            </button>
+          <div className="flex items-center gap-2">
+              {/* Absent on iOS and desktop, which cannot go fullscreen from a
+                  touch context at all. A peer of the actions beside it rather
+                  than a special case, so it inherits their metrics for free.
 
-            {/* Action buttons */}
-            <div className={`
-              ${menuOpen ? 'flex' : 'hidden'} flex-col absolute right-0 top-full mt-1 z-[90] bg-surface-2 border border-border-default shadow-2xl min-w-[160px]
-              @min-[500px]:flex @min-[500px]:static @min-[500px]:flex-row @min-[500px]:items-center @min-[500px]:gap-2
-              @min-[500px]:bg-transparent @min-[500px]:border-0 @min-[500px]:shadow-none @min-[500px]:min-w-0
-            `}>
+                  The icon tracks only the fullscreen state, never `canRotate`:
+                  fullscreen is what this always does, whereas rotation is a bonus
+                  we cannot confirm until lock() has been tried, and letting a
+                  refusal restyle the glyph would mutate the control under the
+                  user's finger. The label carries the difference instead. Stays
+                  mounted while fullscreen regardless, so there is always a way
+                  back out. */}
+              {(rotate.available || rotate.isFullscreen) && (
+                <button
+                  onClick={rotate.isFullscreen ? rotate.exit : rotate.enter}
+                  className={HEADER_ACTION_CLASS}
+                  title={rotate.isFullscreen ? 'Exit fullscreen' : rotate.canRotate ? 'Fullscreen & landscape' : 'Fullscreen'}
+                >
+                  <Icon id={rotate.isFullscreen ? 'fullscreen-exit' : 'fullscreen'} className="w-3 h-3" />
+                </button>
+              )}
               <button
-                onClick={() => { toggleTheme(); setMenuOpen(false); }}
-                className="w-full text-left text-[10px] font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors @min-[500px]:w-auto @min-[500px]:hover:bg-transparent @min-[500px]:border @min-[500px]:border-border-default @min-[500px]:px-2 @min-[500px]:py-1"
+                onClick={toggleTheme}
+                className={HEADER_ACTION_CLASS}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               >
-                <Icon id={theme === 'dark' ? 'sun' : 'moon'} className="w-3.5 h-3.5 @min-[500px]:w-3 @min-[500px]:h-3" />
-                <span className="@min-[500px]:hidden">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                <Icon id={theme === 'dark' ? 'sun' : 'moon'} className="w-3 h-3" />
               </button>
               <button
-                onClick={() => { setIsShareOpen(true); setMenuOpen(false); }}
-                className="w-full text-left text-[10px] font-bold font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors @min-[500px]:w-auto @min-[500px]:hover:bg-transparent @min-[500px]:border @min-[500px]:border-border-default @min-[500px]:px-2 @min-[500px]:py-1"
+                onClick={() => setIsShareOpen(true)}
+                className={HEADER_ACTION_CLASS}
                 title="Share Pattern"
               >
-                <Icon id="share" className="w-3.5 h-3.5 @min-[500px]:w-3 @min-[500px]:h-3" /> Share Beat
+                <Icon id="share" className="w-3 h-3" /> Share Beat
               </button>
               <button
-                onClick={() => { setIsHelpOpen(true); setMenuOpen(false); }}
-                className="w-full text-left text-[10px] font-bold font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors @min-[500px]:w-auto @min-[500px]:hover:bg-transparent @min-[500px]:border @min-[500px]:border-border-default @min-[500px]:px-2 @min-[500px]:py-1"
+                onClick={() => setIsHelpOpen(true)}
+                className={HEADER_ACTION_CLASS}
                 title="Help"
               >
-                <Icon id="help" className="w-3.5 h-3.5 @min-[500px]:w-3 @min-[500px]:h-3" /> Help
+                <Icon id="help" className="w-3 h-3" /> Help
               </button>
               <button
-                onClick={() => { handleReset(); setMenuOpen(false); }}
-                className="w-full text-left text-[10px] font-mono text-fg-muted hover:text-fg hover:bg-surface-4 px-4 py-2.5 uppercase tracking-tighter flex items-center gap-2 transition-colors border-t border-border-dim @min-[500px]:w-auto @min-[500px]:hover:bg-transparent @min-[500px]:border @min-[500px]:border-border-default @min-[500px]:px-2 @min-[500px]:py-1"
+                onClick={handleReset}
+                className={HEADER_ACTION_CLASS}
                 title="Go Back to Setup"
               >
                 Home
               </button>
-            </div>
           </div>
         </header>
 
@@ -396,6 +390,14 @@ function App() {
         />
 
       </div>
+
+      {portraitNudge.visible && (
+        <PortraitNudge
+          canRotate={rotate.canRotate}
+          onRotate={rotate.enter}
+          onDismiss={portraitNudge.dismiss}
+        />
+      )}
     </div>
   )
 }

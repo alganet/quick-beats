@@ -32,6 +32,30 @@ describe('DrumKitButton', () => {
         expect(screen.getByRole('menuitemradio', { name: /red zeppelin/i })).toHaveAttribute('aria-checked', 'false');
     });
 
+    it('hangs the popover off the right edge by default', () => {
+        renderWithSprite(<DrumKitButton kits={KITS} activeKit="black-pearl" onSelectKit={vi.fn()} />);
+        fireEvent.click(screen.getByRole('button', { name: /drum kit/i }));
+        expect(screen.getByRole('menu')).toHaveClass('right-0');
+    });
+
+    it('honours a caller-supplied anchor, for buttons sitting against the left edge', () => {
+        // A right-anchored 12rem popover opens off-screen when the trigger is at
+        // the left of the viewport, as it is in Setup's landscape branding column.
+        renderWithSprite(
+            <DrumKitButton
+                kits={KITS} activeKit="black-pearl" onSelectKit={vi.fn()}
+                menuClassName="right-0 short-landscape:right-auto short-landscape:left-0"
+                arrowClassName="right-3 short-landscape:right-auto short-landscape:left-3"
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: /drum kit/i }));
+
+        const menu = screen.getByRole('menu');
+        expect(menu).toHaveClass('short-landscape:left-0');
+        expect(menu).toHaveClass('short-landscape:right-auto');
+        expect(menu.firstElementChild).toHaveClass('short-landscape:left-3');
+    });
+
     it('fires onSelectKit with the chosen kit id', () => {
         const onSelectKit = vi.fn();
         renderWithSprite(<DrumKitButton kits={KITS} activeKit="black-pearl" onSelectKit={onSelectKit} />);

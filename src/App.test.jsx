@@ -511,6 +511,19 @@ describe('App', () => {
         window.matchMedia = origMatchMedia;
     });
 
+    it('omits the rotate button where the platform cannot lock orientation', () => {
+        // jsdom has no Fullscreen API, standing in for iOS and desktop — the two
+        // places rotation is unavailable. The control must not appear at all
+        // rather than appear and silently do nothing.
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        expect(screen.queryByTitle('Rotate to landscape')).not.toBeInTheDocument();
+        expect(screen.queryByTitle('Exit fullscreen')).not.toBeInTheDocument();
+    });
+
     it('supports BPM keyboard shortcuts (- / =)', () => {
         vi.useFakeTimers();
         mockUseAudio.isLoaded = true;
@@ -790,50 +803,36 @@ describe('App', () => {
         expect(screen.getByTestId('icon-sun')).toBeInTheDocument();
     });
 
-    it('opens and closes hamburger menu', () => {
+    it('exposes every header action directly, with no menu to open first', () => {
+        // The wordmark collapses instead of the actions, so the row always fits
+        // and there is no hamburger to unfold.
         mockUseAudio.isLoaded = true;
         render(<App />);
         fireEvent.click(screen.getByText('Select 4/4'));
         fireEvent.click(screen.getByText('Start'));
 
-        const menuBtn = screen.getByTitle('Menu');
-
-        // Menu starts closed — action buttons are in the DOM but hidden via CSS
-        // (container query controls visibility, but in jsdom they're always rendered)
-
-        // Open menu
-        fireEvent.click(menuBtn);
-        // Buttons should still be accessible
+        expect(screen.queryByTitle('Menu')).not.toBeInTheDocument();
         expect(screen.getByTitle('Share Pattern')).toBeInTheDocument();
         expect(screen.getByTitle('Help')).toBeInTheDocument();
         expect(screen.getByTitle('Go Back to Setup')).toBeInTheDocument();
-
-        // Close menu by clicking outside
-        fireEvent.mouseDown(document.body);
-        // Menu button still present
-        expect(screen.getByTitle('Menu')).toBeInTheDocument();
     });
 
-    it('closes menu when an action is selected', () => {
+    it('opens help straight from the header', () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
         fireEvent.click(screen.getByText('Select 4/4'));
         fireEvent.click(screen.getByText('Start'));
 
-        // Open menu and click Help — should open help and close menu
-        fireEvent.click(screen.getByTitle('Menu'));
         fireEvent.click(screen.getByTitle('Help'));
         expect(screen.getByTestId('mock-help')).toBeInTheDocument();
     });
 
-    it('theme toggle works from within the menu', () => {
+    it('toggles theme straight from the header', () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
         fireEvent.click(screen.getByText('Select 4/4'));
         fireEvent.click(screen.getByText('Start'));
 
-        // Open menu, toggle theme
-        fireEvent.click(screen.getByTitle('Menu'));
         fireEvent.click(screen.getByTitle('Switch to light theme'));
         expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     });

@@ -127,8 +127,16 @@ export const IconSprite = () => (
         <symbol id="icon-moon" viewBox="0 0 24 24">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </symbol>
-        <symbol id="icon-menu" viewBox="0 0 24 24">
-            <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <symbol id="icon-rotate" viewBox="0 0 24 24">
+            <rect x="2" y="9" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2" fill="none" />
+            <path d="M8 5.5A6.5 6.5 0 0 1 17.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+            <path d="M18 2v3h-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </symbol>
+        <symbol id="icon-fullscreen" viewBox="0 0 24 24">
+            <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </symbol>
+        <symbol id="icon-fullscreen-exit" viewBox="0 0 24 24">
+            <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </symbol>
     </svg>
 );

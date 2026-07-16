@@ -29,7 +29,7 @@ export default function LoadingScreen({ progress = 0 }) {
             role="status"
             aria-live="polite"
             aria-label={`Loading sounds, ${pct} percent`}
-            className="min-w-[360px] min-h-screen w-full flex flex-col items-center justify-center bg-surface-0 p-6"
+            className="min-w-[360px] min-h-dvh w-full flex flex-col items-center justify-center bg-surface-0 p-6"
         >
             <IconSprite />
             {/* Anti-flash: stay invisible until the delay passes so a loader that

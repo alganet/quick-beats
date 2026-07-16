@@ -6,6 +6,33 @@
 
 @import "tailwindcss";
 
+/* Short landscape: phones turned sideways, where vertical space is the scarce
+   resource. Gated on height rather than orientation because a landscape tablet
+   (744px+ tall) has room for the stacked layout; landscape phones top out around
+   430px. Tailwind ships landscape:/portrait: but no height variant. */
+@custom-variant short-landscape (@media (orientation: landscape) and (max-height: 540px));
+
+/* Pairs with viewport-fit=cover in index.html. border-box means these eat into
+   100vw/100dvh rather than adding to it, so content clears the notch while
+   backgrounds still paint underneath.
+
+   Only for elements that own no other padding: this sets all four longhands, so
+   on an element with p-6 it would silently win and erase the gutter. Elements
+   that need both want safe-px-6 instead. */
+@utility safe-inset {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+/* The horizontal screen gutter, widened only where a notch actually intrudes.
+   Use in place of px-6 — never alongside it. */
+@utility safe-px-6 {
+  padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
+}
+
 @theme {
   --color-surface-0: #0a0a0a;
   --color-surface-1: #111111;
