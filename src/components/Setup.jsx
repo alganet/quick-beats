@@ -59,14 +59,25 @@ export default function Setup({
 
                     {/* Confirm Button Area — a gradient bar pinned to the bottom
                         when stacked, a plain in-flow button in the left column
-                        when short-landscape (where mt-6 finally applies). */}
-                    <div className="fixed bottom-0 w-full left-0 mt-6 flex items-center justify-center p-4 pt-20 bg-gradient-to-t from-surface-0 to-transparent pointer-events-none short-landscape:static short-landscape:w-auto short-landscape:p-0 short-landscape:pt-0 short-landscape:bg-none short-landscape:pointer-events-auto short-landscape:justify-start">
+                        when short-landscape (where mt-6 finally applies).
+
+                        The z-50 belongs here, on the fixed element, and not on
+                        the button: `position: fixed` always opens a stacking
+                        context, so a z-index inside this bar can only order it
+                        against its own siblings — it cannot lift the button over
+                        the signature cards, which are positioned too and come
+                        later in the document. Without a z-index of its own the
+                        bar loses that tie on DOM order and the cards scroll over
+                        the button, swallowing the tap that was meant to start
+                        playing. Inert once short-landscape makes this static,
+                        which is fine: in flow there is nothing to overlap. */}
+                    <div className="fixed bottom-0 w-full left-0 z-50 mt-6 flex items-center justify-center p-4 pt-20 bg-gradient-to-t from-surface-0 to-transparent pointer-events-none short-landscape:static short-landscape:w-auto short-landscape:p-0 short-landscape:pt-0 short-landscape:bg-none short-landscape:pointer-events-auto short-landscape:justify-start">
                         {/* short-landscape:w-full wins over md:w-64 (it is emitted later),
                             keeping the button inside a branding column narrower than 16rem. */}
                         {selectedSig && (
                             <button
                                 onClick={onConfirm}
-                                className="z-50 relative w-full md:w-64 bg-primary text-fg font-black py-4 hover:bg-primary-hover transition-all tracking-[0.3em] uppercase text-sm pointer-events-auto short-landscape:w-full"
+                                className="w-full md:w-64 bg-primary text-fg font-black py-4 hover:bg-primary-hover transition-all tracking-[0.3em] uppercase text-sm pointer-events-auto short-landscape:w-full"
                             >
                                 Confirm & Start
                             </button>
