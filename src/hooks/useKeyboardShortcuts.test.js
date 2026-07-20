@@ -25,8 +25,8 @@ describe('useKeyboardShortcuts', () => {
             setBpmInput: vi.fn(),
             setZoom: vi.fn(),
             setAutoScroll: vi.fn(),
-            setIsHelpOpen: vi.fn(),
-            setIsShareOpen: vi.fn(),
+            openHelp: vi.fn(),
+            onCloseOverlay: vi.fn(),
             humanizeAction: vi.fn(),
         };
     });
@@ -60,7 +60,7 @@ describe('useKeyboardShortcuts', () => {
     it('? opens help', () => {
         mount();
         press('?');
-        expect(handlers.setIsHelpOpen).toHaveBeenCalledWith(true);
+        expect(handlers.openHelp).toHaveBeenCalledTimes(1);
     });
 
     it('- decrements BPM, clamped at 60', () => {
@@ -113,11 +113,10 @@ describe('useKeyboardShortcuts', () => {
         expect(handlers.humanizeAction).toHaveBeenCalledTimes(1);
     });
 
-    it('Escape closes both modals', () => {
+    it('Escape routes through the shared close-overlay path', () => {
         mount();
         press('Escape');
-        expect(handlers.setIsShareOpen).toHaveBeenCalledWith(false);
-        expect(handlers.setIsHelpOpen).toHaveBeenCalledWith(false);
+        expect(handlers.onCloseOverlay).toHaveBeenCalledTimes(1);
     });
 
     it('ignores keys while typing in form controls', () => {
@@ -127,7 +126,7 @@ describe('useKeyboardShortcuts', () => {
         press('?', { target: { tagName: 'SELECT' } });
         expect(handlers.togglePlay).not.toHaveBeenCalled();
         expect(handlers.humanizeAction).not.toHaveBeenCalled();
-        expect(handlers.setIsHelpOpen).not.toHaveBeenCalled();
+        expect(handlers.openHelp).not.toHaveBeenCalled();
     });
 
     it('+ also increments BPM (tooltip documents it)', () => {
@@ -181,13 +180,12 @@ describe('useKeyboardShortcuts', () => {
         expect(handlers.setAutoScroll).not.toHaveBeenCalled();
         expect(handlers.humanizeAction).not.toHaveBeenCalled();
         expect(handlers.setBpmInput).not.toHaveBeenCalled();
-        expect(handlers.setIsHelpOpen).not.toHaveBeenCalledWith(true);
+        expect(handlers.openHelp).not.toHaveBeenCalled();
 
         press(' ', { code: 'Space' });
         expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
         press('Escape');
-        expect(handlers.setIsShareOpen).toHaveBeenCalledWith(false);
-        expect(handlers.setIsHelpOpen).toHaveBeenCalledWith(false);
+        expect(handlers.onCloseOverlay).toHaveBeenCalledTimes(1);
     });
 
     it('removes the keydown listener on unmount', () => {

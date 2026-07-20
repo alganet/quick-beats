@@ -7,7 +7,7 @@ import { useTheme } from './hooks/useTheme'
 import { useAudio } from './hooks/useAudio'
 import { useHumanize } from './hooks/useHumanize'
 import { useSamplePreload } from './hooks/useSamplePreload'
-import { useHashSync } from './hooks/useHashSync'
+import { useHistoryState } from './hooks/useHistoryState'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useHumanizeLifecycle } from './hooks/useHumanizeLifecycle'
 import { useLandscapeLock } from './hooks/useLandscapeLock'
@@ -25,7 +25,8 @@ import { normalizeZoom } from './data/sequencerConfig'
 import { INSTRUMENTS, KITS, DEFAULT_KIT_ID } from './data/kit'
 import { BACKBEATS } from './data/patterns'
 import { COMMON_SIGNATURES } from './data/signatures'
-import { parseInitialHash } from './utils/hashState';
+import { parseInitialHash, buildShareHash } from './utils/hashState';
+import { parseRoute } from './utils/routeState';
 import {
   calculateBulkUpdate,
   calculateGridWithRemovedMeasure,
@@ -53,8 +54,14 @@ function App() {
   const rotate = useLandscapeLock();
   const portraitNudge = usePortraitNudge();
 
-  const _initialHash = typeof window !== 'undefined'
-    ? parseInitialHash(window.location.hash.substring(1), INSTRUMENTS.length, COMMON_SIGNATURES)
+  // Split the loaded hash into its overlay and beat parts, then decode the beat
+  // exactly as before. A legacy beat-only link parses identically — parseRoute
+  // returns { overlay:'none', beat:<the whole legacy string> }.
+  const _initialRoute = typeof window !== 'undefined'
+    ? parseRoute(window.location.hash)
+    : { overlay: 'none', beat: null };
+  const _initialHash = _initialRoute.beat
+    ? parseInitialHash(_initialRoute.beat, INSTRUMENTS.length, COMMON_SIGNATURES)
     : null;
 
   // Which kit to start on: a shared link wins, then the last choice persisted in
@@ -95,8 +102,9 @@ function App() {
   }, [activeKit, switchingKit, loadKit]);
 
   const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
-  const [isShareOpen, setIsShareOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  // Seed the modals from a deep link (#help / #help~beat / #share~beat).
+  const [isShareOpen, setIsShareOpen] = useState(_initialRoute.overlay === 'share');
+  const [isHelpOpen, setIsHelpOpen] = useState(_initialRoute.overlay === 'help');
   const [timeSignature, setTimeSignature] = useState(_initialHash?.sig ?? null);
   const [previewSig, setPreviewSig] = useState(_initialHash?.sig ?? null);
   const [bpmInput, setBpmInput] = useState(_initialHash?.bpm ?? 120);
@@ -175,39 +183,89 @@ function App() {
     humanize,
   });
 
+  // Which named overlay is open, if any — the modals are mutually exclusive, so
+  // one slot captures the whole set. Mirrored into a ref so the imperative close
+  // path can read it without re-subscribing listeners on every open/close.
+  const overlay = isShareOpen ? 'share' : isHelpOpen ? 'help' : 'none';
+  const overlayRef = useRef(overlay);
+  useEffect(() => { overlayRef.current = overlay; });
+
+  // Adopt a beat that arrives in the URL after load — an installed PWA gets a
+  // tapped share link as a fragment change on the running document, not as a
+  // fresh page load, so the hash has to be applied to live state here rather
+  // than seeding it at mount. An unparseable hash with no overlay is left alone:
+  // whatever is on screen is worth more than a link we can't read.
+  const handleExternalHash = useCallback((hash) => {
+    const route = parseRoute(hash);
+    const shared = route.beat
+      ? parseInitialHash(route.beat, INSTRUMENTS.length, COMMON_SIGNATURES)
+      : null;
+    if (!shared && route.overlay === 'none') return;
+
+    if (shared) {
+      setBpmInput(shared.bpm);
+      setTimeSignature(shared.sig);
+      setPreviewSig(shared.sig);
+      setGrid(shared.grid);
+      // The incoming grid can be a different length than the one playing, so the
+      // playhead has to come back to a step that certainly exists.
+      setStep(0);
+      setIsSetup(true);
+      handleSelectKit(shared.kitId);
+    }
+    // Apply the overlay the link named (opening or closing to match it).
+    setIsHelpOpen(route.overlay === 'help');
+    setIsShareOpen(route.overlay === 'share');
+  }, [setStep, handleSelectKit]);
+
+  // Back / Forward is the single authoritative place an overlay closes: it reads
+  // the target history entry's stamp and sets the flags to match. Close buttons
+  // and Escape route through history.back() so they can't double-close.
+  const onPopOverlay = useCallback((name) => {
+    setIsHelpOpen(name === 'help');
+    setIsShareOpen(name === 'share');
+  }, []);
+
+  // Keep the URL hash in sync with the live pattern (debounced) and own the
+  // overlay history entries (push on open, pop on close/back).
+  const { openOverlay } = useHistoryState({
+    isSetup, timeSignature, grid, bpmInput, activeKit,
+    overlay,
+    onPopOverlay,
+    onExternalHash: handleExternalHash,
+  });
+
+  // Open a modal: flip its flag (instant render) and push a back-poppable entry.
+  // No-ops while any overlay is up: the dialogs only swallow Escape and Tab, so
+  // a `?` pressed inside an open Help would otherwise reach the global shortcut
+  // and push a duplicate history entry per press — Back would then need that
+  // many presses to close. (Before history entries, re-opening was idempotent.)
+  const openHelp = useCallback(() => {
+    if (overlayRef.current !== 'none') return;
+    setIsHelpOpen(true);
+    openOverlay('help');
+  }, [openOverlay]);
+  const openShare = useCallback(() => {
+    if (overlayRef.current !== 'none') return;
+    setIsShareOpen(true);
+    openOverlay('share');
+  }, [openOverlay]);
+  // Close the top overlay via history so Back, the X button, and Escape share
+  // one path. A no-op when nothing is open (a stray Escape must not leave the app).
+  const closeOverlay = useCallback(() => {
+    if (overlayRef.current !== 'none') window.history.back();
+  }, []);
+
   useKeyboardShortcuts({
     togglePlay,
     setBpmInput,
     setZoom: chooseZoom,
     setAutoScroll: chooseAutoScroll,
-    setIsHelpOpen,
-    setIsShareOpen,
+    openHelp,
+    onCloseOverlay: closeOverlay,
     humanizeAction,
     singleKeyEnabled: singleKeyShortcuts,
   });
-
-  // Adopt a beat that arrives in the URL after load — an installed PWA gets a
-  // tapped share link as a fragment change on the running document, not as a
-  // fresh page load, so the hash has to be applied to live state here rather
-  // than seeding it at mount. An unparseable hash is left alone: whatever is on
-  // screen is worth more than a link we can't read.
-  const handleExternalHash = useCallback((hash) => {
-    const shared = parseInitialHash(hash, INSTRUMENTS.length, COMMON_SIGNATURES);
-    if (!shared) return;
-
-    setBpmInput(shared.bpm);
-    setTimeSignature(shared.sig);
-    setPreviewSig(shared.sig);
-    setGrid(shared.grid);
-    // The incoming grid can be a different length than the one playing, so the
-    // playhead has to come back to a step that certainly exists.
-    setStep(0);
-    setIsSetup(true);
-    handleSelectKit(shared.kitId);
-  }, [setStep, handleSelectKit]);
-
-  // Keep the URL hash in sync with the live pattern (debounced).
-  useHashSync({ isSetup, timeSignature, grid, bpmInput, activeKit, onExternalHash: handleExternalHash });
 
   // Sync BPM to audio engine on a short delay so UI can update instantly while
   // avoiding excessive tempo updates during rapid user input.
@@ -304,7 +362,7 @@ function App() {
         <IconSprite />
         <Help
           isOpen={isHelpOpen}
-          onClose={() => setIsHelpOpen(false)}
+          onClose={closeOverlay}
           showKeyboardCheatsheet={showKeyboardCheatsheet}
           singleKeyShortcuts={singleKeyShortcuts}
           onToggleSingleKeyShortcuts={() => setSingleKeyShortcuts((v) => !v)}
@@ -313,7 +371,7 @@ function App() {
           onSelect={handlePreview}
           onConfirm={handleConfirm}
           selectedSig={previewSig}
-          onShowHelp={() => setIsHelpOpen(true)}
+          onShowHelp={openHelp}
           kits={KITS}
           activeKit={activeKit}
           switchingKit={switchingKit}
@@ -377,14 +435,14 @@ function App() {
                 <Icon id={theme === 'dark' ? 'sun' : 'moon'} className="w-3 h-3" />
               </button>
               <button
-                onClick={() => setIsShareOpen(true)}
+                onClick={openShare}
                 className={HEADER_ACTION_CLASS}
                 title="Share Pattern"
               >
                 <Icon id="share" className="w-3 h-3" /> Share Beat
               </button>
               <button
-                onClick={() => setIsHelpOpen(true)}
+                onClick={openHelp}
                 className={HEADER_ACTION_CLASS}
                 title="Help"
               >
@@ -402,7 +460,7 @@ function App() {
 
         <Help
           isOpen={isHelpOpen}
-          onClose={() => setIsHelpOpen(false)}
+          onClose={closeOverlay}
           showKeyboardCheatsheet={showKeyboardCheatsheet}
           singleKeyShortcuts={singleKeyShortcuts}
           onToggleSingleKeyShortcuts={() => setSingleKeyShortcuts((v) => !v)}
@@ -410,8 +468,13 @@ function App() {
 
         <ShareModal
           isOpen={isShareOpen}
-          onClose={() => setIsShareOpen(false)}
-          shareUrl={window.location.href}
+          onClose={closeOverlay}
+          // The live URL carries `share~` while this modal is open, so a copied
+          // link would reopen Share. Share the clean, overlay-free beat link.
+          shareUrl={isShareOpen
+            ? window.location.origin + window.location.pathname + '#'
+              + buildShareHash({ bpm: bpmInput, sigName: timeSignature.name, kitId: activeKit, grid })
+            : ''}
         />
 
         <div className="px-4 pt-2 md:px-6 short-landscape:pt-1 bg-surface-6 border border-border-dim">

@@ -22,8 +22,8 @@ export function useKeyboardShortcuts({
     setBpmInput,
     setZoom,
     setAutoScroll,
-    setIsHelpOpen,
-    setIsShareOpen,
+    openHelp,
+    onCloseOverlay,
     humanizeAction,
     singleKeyEnabled = true,
 }) {
@@ -84,10 +84,12 @@ export function useKeyboardShortcuts({
             }
 
             // Escape stays live regardless of the single-key preference — it is
-            // not a printable character, so 2.1.4 doesn't apply to it.
+            // not a printable character, so 2.1.4 doesn't apply to it. Routed
+            // through the shared close path (history.back) so it can't
+            // double-close with a dialog's own Escape handling; a no-op when
+            // nothing is open.
             if (e.key === 'Escape') {
-                setIsShareOpen(false);
-                setIsHelpOpen(false);
+                onCloseOverlay?.();
                 return;
             }
 
@@ -102,7 +104,7 @@ export function useKeyboardShortcuts({
 
             // ? => show help
             if (e.key === '?') {
-                setIsHelpOpen(true);
+                openHelp?.();
                 return;
             }
 
@@ -139,5 +141,5 @@ export function useKeyboardShortcuts({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, setBpmInput, setIsHelpOpen, setIsShareOpen, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle, humanizeAction, singleKeyEnabled]);
+    }, [togglePlay, setBpmInput, openHelp, onCloseOverlay, scheduleKeyboardZoomToggle, scheduleKeyboardAutoScrollToggle, humanizeAction, singleKeyEnabled]);
 }

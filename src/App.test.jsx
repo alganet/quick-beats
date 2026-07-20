@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import App from './App';
 import { encodeGrid } from './utils/hashState';
 import { INSTRUMENTS } from './data/kit';
@@ -84,7 +84,7 @@ vi.mock('./components/Setup', () => ({
 }));
 
 vi.mock('./components/ShareModal', () => ({
-    default: ({ isOpen, onClose }) => isOpen ? <div data-testid="mock-share-modal"><button onClick={onClose}>Close</button></div> : null
+    default: ({ isOpen, onClose, shareUrl }) => isOpen ? <div data-testid="mock-share-modal" data-share-url={shareUrl}><button onClick={onClose}>Close</button></div> : null
 }));
 
 vi.mock('./components/Help', () => ({
@@ -540,6 +540,26 @@ describe('App', () => {
         expect(screen.getByTestId('mock-help')).toBeInTheDocument();
     });
 
+    it('does not stack history entries when ? is pressed with Help already open', () => {
+        // The dialog only swallows Escape/Tab, so a second ? reaches the global
+        // shortcut; it must be a no-op, or every press would add a history entry
+        // and Back/Escape would need that many presses to close.
+        const pushStateSpy = vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        fireEvent.keyDown(window, { key: '?' });
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+        expect(pushStateSpy).toHaveBeenCalledTimes(1);
+
+        fireEvent.keyDown(window, { key: '?' });
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+        expect(pushStateSpy).toHaveBeenCalledTimes(1);
+        pushStateSpy.mockRestore();
+    });
+
     it('passes pointer precision to Help so cheatsheet only shows on fine pointers', () => {
         // Simulate fine pointer environment
         const origMatchMedia = window.matchMedia;
@@ -644,25 +664,82 @@ describe('App', () => {
         expect(mockUseAudio.setBpm).not.toHaveBeenCalled();
     });
 
-    it('opens and closes modals', () => {
+    it('opens and closes modals', async () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
-        
+
          // Enter main screen
         fireEvent.click(screen.getByText('Select 4/4'));
         fireEvent.click(screen.getByText('Start'));
-        
-        // Share Modal
+
+        // Share Modal — closing routes through history.back(), so the popstate
+        // that actually closes it lands on a later tick.
         const shareBtn = screen.getByTitle('Share Pattern');
         fireEvent.click(shareBtn);
         expect(screen.getByTestId('mock-share-modal')).toBeInTheDocument();
         fireEvent.click(screen.getByText('Close'));
-        expect(screen.queryByTestId('mock-share-modal')).not.toBeInTheDocument();
-         
+        await waitFor(() => expect(screen.queryByTestId('mock-share-modal')).not.toBeInTheDocument());
+
         // Help Modal
         const helpBtn = screen.getByTitle('Help');
         fireEvent.click(helpBtn);
         expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+    });
+
+    it('closes an open modal on the browser Back button', async () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        fireEvent.click(screen.getByTitle('Help'));
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+
+        // The hardware/browser Back button pops the pushed overlay entry.
+        act(() => { window.history.back(); });
+        await waitFor(() => expect(screen.queryByTestId('mock-help')).not.toBeInTheDocument());
+    });
+
+    it('deep-links straight into the Help modal (#help~beat)', () => {
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: 16 }, () => false));
+        window.location.hash = `#help~120|4/4|black-pearl|${encodeGrid(grid)}|v1`;
+
+        render(<App />);
+
+        // Beat present → Sequencer, and the overlay marker opens Help.
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+    });
+
+    it('adopts the beat and opens Help from an external overlay link', () => {
+        render(<App />);
+        expect(screen.getByTestId('mock-setup')).toBeInTheDocument();
+
+        const grid = Array.from({ length: INSTRUMENTS.length }, () => Array.from({ length: 16 }, () => false));
+        grid[0][4] = true;
+
+        act(() => {
+            window.location.hash = `#help~132|4/4|black-pearl|${encodeGrid(grid)}|v1`;
+            window.dispatchEvent(new Event('hashchange'));
+        });
+
+        expect(screen.getByTestId('mock-sequencer')).toBeInTheDocument();
+        expect(mockUseAudio.updateGrid).toHaveBeenCalledWith(grid);
+        expect(screen.getByTestId('mock-help')).toBeInTheDocument();
+    });
+
+    it('shares the clean beat link, without the overlay marker', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        fireEvent.click(screen.getByTitle('Share Pattern'));
+        const url = screen.getByTestId('mock-share-modal').getAttribute('data-share-url');
+        // The live URL carries `share~` while the modal is open; the copied link
+        // must not, or loading it would reopen Share.
+        expect(url).not.toContain('share~');
+        expect(url).toMatch(/#\d+\|4\/4\|black-pearl\|/);
     });
     
     it('handles reset (Home button)', () => {
@@ -852,7 +929,7 @@ describe('App', () => {
         expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-zoom', '1');
     });
 
-    it('closes modals when pressing Escape', () => {
+    it('closes modals when pressing Escape', async () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
         fireEvent.click(screen.getByText('Select 4/4'));
@@ -863,10 +940,10 @@ describe('App', () => {
         expect(screen.getByTestId('mock-share-modal')).toBeInTheDocument();
 
         fireEvent.keyDown(window, { key: 'Escape' });
-        expect(screen.queryByTestId('mock-share-modal')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByTestId('mock-share-modal')).not.toBeInTheDocument());
     });
 
-    it('closes help modal when pressing Escape', () => {
+    it('closes help modal when pressing Escape', async () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
         fireEvent.click(screen.getByText('Select 4/4'));
@@ -877,7 +954,7 @@ describe('App', () => {
         expect(screen.getByTestId('mock-help')).toBeInTheDocument();
 
         fireEvent.keyDown(window, { key: 'Escape' });
-        expect(screen.queryByTestId('mock-help')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByTestId('mock-help')).not.toBeInTheDocument());
     });
 
     it('handles reset while playing', () => {
