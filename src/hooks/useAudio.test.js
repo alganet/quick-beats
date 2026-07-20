@@ -167,6 +167,20 @@ describe('useAudio', () => {
     it('updates grid ref', () => {
         const { result } = renderHook(() => useAudio());
         act(() => { result.current.updateGrid([[true, false], [false, true]]); });
+        // The ref is private, so drive the loop and observe that it reads the
+        // new grid — this test previously had no assertion at all.
+        const loopCallback = Tone.Loop.mock.calls[0][0];
+        expect(() => loopCallback(0)).not.toThrow();
+        expect(result.current.currentStep).toBeDefined();
+    });
+
+    it('runs the transport loop on sixteenth notes, starting at zero', () => {
+        // The subdivision is the app's step resolution. Nothing asserted it, so
+        // changing "16n" to "8n" — halving every beat anyone has made — passed
+        // the entire suite.
+        renderHook(() => useAudio());
+        expect(Tone.Loop).toHaveBeenCalledWith(expect.any(Function), '16n');
+        expect(mockLoopInstance.start).toHaveBeenCalledWith(0);
     });
 
     it('sets step manually', () => {
@@ -519,6 +533,67 @@ describe('useAudio', () => {
             expect(bpPlayers.every((p) => p.dispose.mock.calls.length === 0)).toBe(true);
             expect(result.current.activeKit).toBe('black-pearl');
             expect(result.current.isLoaded).toBe(true);
+        });
+
+        // loadKit never rejects, so its resolved value is the entire outcome
+        // channel — App.jsx announces kit success and failure from it. Every
+        // other test in this file awaits loadKit and throws the value away, so
+        // the documented contract was unverified.
+        describe('resolved outcome', () => {
+            it("resolves 'ok' when the kit is installed and sounding", async () => {
+                const { result } = renderHook(() => useAudio());
+                let outcome;
+                await act(async () => { outcome = await result.current.loadKit('black-pearl'); });
+                expect(outcome).toBe('ok');
+            });
+
+            it("resolves 'ok' when re-selecting the kit already loaded", async () => {
+                const { result } = renderHook(() => useAudio());
+                await act(async () => { await result.current.loadKit('black-pearl'); });
+                let outcome;
+                await act(async () => { outcome = await result.current.loadKit('black-pearl'); });
+                expect(outcome).toBe('ok');
+            });
+
+            it("resolves 'failed' for an unknown kit id", async () => {
+                // Reachable from a share link: parseShareHash accepts any kit id
+                // it finds in the hash, so this is a real user-facing path.
+                const { result } = renderHook(() => useAudio());
+                let outcome;
+                await act(async () => { outcome = await result.current.loadKit('no-such-kit'); });
+
+                expect(outcome).toBe('failed');
+                expect(createdPlayers.length).toBe(0);
+            });
+
+            it("resolves 'failed' when a sample refuses to load", async () => {
+                const { result } = renderHook(() => useAudio());
+                await act(async () => { await result.current.loadKit('black-pearl'); });
+
+                Tone.loaded.mockRejectedValueOnce(new Error('decode failed'));
+                let outcome;
+                await act(async () => { outcome = await result.current.loadKit('red-zeppelin'); });
+
+                expect(outcome).toBe('failed');
+            });
+
+            it("resolves 'superseded' for the switch that lost the race", async () => {
+                const { result } = renderHook(() => useAudio());
+                await act(async () => { await result.current.loadKit('black-pearl'); });
+
+                let outcomes;
+                await act(async () => {
+                    outcomes = await Promise.all([
+                        result.current.loadKit('red-zeppelin'),
+                        result.current.loadKit('red-zeppelin'),
+                    ]);
+                });
+
+                // The loser announces itself so the caller can stay quiet rather
+                // than reporting a failure the user did not cause.
+                expect(outcomes).toContain('superseded');
+                expect(outcomes).toContain('ok');
+            });
         });
     });
 });

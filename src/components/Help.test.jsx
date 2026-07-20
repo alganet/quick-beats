@@ -92,4 +92,67 @@ describe('Help', () => {
         expect(screen.getByText('Deleting Measures')).toBeInTheDocument();
         expect(screen.getByText('About')).toBeInTheDocument();
     });
+
+    // The escape hatch for anyone whose speech-input or assistive software sends
+    // bare letters: it is the one control in here that changes how the app
+    // listens, and none of it — presence, state, or click — was covered.
+    describe('single-key shortcuts toggle', () => {
+        const open = (props) => render(
+            <Help isOpen onClose={() => {}} showKeyboardCheatsheet {...props} />,
+        );
+        const toggle = () => screen.getByRole('button', { name: /single-key shortcuts/i });
+
+        it('is absent when the host provides no toggle handler', () => {
+            open({});
+            expect(screen.queryByRole('button', { name: /single-key shortcuts/i })).not.toBeInTheDocument();
+        });
+
+        it.each([
+            ['on', true, 'Single-key shortcuts: On'],
+            ['off', false, 'Single-key shortcuts: Off'],
+        ])('reports state %s to assistive tech and in its label', (_label, singleKeyShortcuts, text) => {
+            open({ singleKeyShortcuts, onToggleSingleKeyShortcuts: vi.fn() });
+
+            expect(toggle()).toHaveAttribute('aria-pressed', String(singleKeyShortcuts));
+            expect(toggle()).toHaveTextContent(text);
+        });
+
+        it('calls back on click', () => {
+            const onToggleSingleKeyShortcuts = vi.fn();
+            open({ singleKeyShortcuts: true, onToggleSingleKeyShortcuts });
+
+            fireEvent.click(toggle());
+
+            expect(onToggleSingleKeyShortcuts).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('dialog semantics', () => {
+        it('exposes itself as a modal dialog labelled by its heading', () => {
+            render(<Help isOpen onClose={() => {}} />);
+
+            const dialog = screen.getByRole('dialog');
+            expect(dialog).toHaveAttribute('aria-modal', 'true');
+            expect(dialog).toHaveAttribute('aria-labelledby', 'help-title');
+            expect(document.getElementById('help-title')).toHaveTextContent('How to Use');
+        });
+
+        it('closes on Escape pressed inside the dialog', () => {
+            // Wired through useDialog, which listens on the dialog element rather
+            // than on document — deliberately, so the press is stopped there and
+            // neither the global shortcut handler nor a dialog underneath acts on
+            // it. The button says "Close [ESC]", so the key has to work.
+            const onClose = vi.fn();
+            render(<Help isOpen onClose={onClose} />);
+
+            fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+            expect(onClose).toHaveBeenCalledTimes(1);
+        });
+
+        it('moves focus into the dialog on open', () => {
+            render(<Help isOpen onClose={() => {}} />);
+            expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true);
+        });
+    });
 });

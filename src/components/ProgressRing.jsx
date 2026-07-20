@@ -8,7 +8,13 @@
 const RING_CIRC = 2 * Math.PI * 15;
 
 export default function ProgressRing({ progress, children }) {
-    const p = Math.max(0, Math.min(1, progress));
+    // Coerce, then check finiteness: Math.max/Math.min pass NaN straight
+    // through, so an undefined or divide-by-zero progress would reach the DOM as
+    // stroke-dasharray="NaN 94.2" — invalid SVG, and the ring vanishes instead
+    // of showing an empty state. Number() first rather than Number.isFinite on
+    // the raw prop, so a numeric string still renders the arc it used to.
+    const n = Number(progress);
+    const p = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
     return (
         <span className="relative w-6 h-6 grid place-items-center">
             <svg viewBox="0 0 36 36" className="absolute inset-0 w-full h-full -rotate-90">

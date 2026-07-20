@@ -20,8 +20,10 @@ import {
     rescaleOffsets,
     computePerfLayer,
     windowHasHits,
+    MAX_WINDOWS,
 } from './grooveConvert';
 import { NUM_STEPS, NUM_CLASSES, DEPTH } from './grooveModel';
+import { MAX_GRID_COLS } from '../data/sequencerConfig';
 
 const stubOutput = () =>
     Array.from({ length: NUM_STEPS }, () => {
@@ -195,8 +197,44 @@ describe('grooveConvert', () => {
             humanizeSpy.mockImplementation(stubOutput);
         });
 
-        it('returns null for an empty grid', () => {
-            expect(computePerfLayer({}, [], 120)).toBeNull();
+        it.each([
+            ['an empty grid', []],
+            ['a grid whose only row is empty', [[]]],
+            ['a grid whose first row is missing', [undefined]],
+        ])('returns null for %s', (_label, grid) => {
+            expect(computePerfLayer({}, grid, 120)).toBeNull();
+        });
+
+        it('caps at exactly the column ceiling the share-link decoder enforces', () => {
+            // decodeGrid rejects a link past MAX_GRID_COLS specifically because
+            // anything beyond it could not be humanized anyway. The two numbers
+            // are stated in different files, so pin them together here — drifting
+            // apart means either links are rejected that would have worked, or
+            // accepted grids get silently truncated at humanize time.
+            expect(MAX_GRID_COLS).toBe(MAX_WINDOWS * NUM_STEPS);
+        });
+
+        it('caps a pathological grid at MAX_WINDOWS model runs', () => {
+            // Each window is a full 32-step LSTM pass, so an unbounded step count
+            // — reachable from a hand-edited share link — would run the model for
+            // as long as the grid is long. 16 windows is the ceiling; a 1024-step
+            // grid must not cost 32 passes.
+            const grid = emptyGrid(7, 32 * 32);
+            for (let c = 0; c < grid[0].length; c += 32) grid[0][c] = true;
+
+            computePerfLayer({}, grid, 120);
+
+            expect(humanizeSpy).toHaveBeenCalledTimes(16);
+        });
+
+        it('returns an empty layer without running the model when nothing is hit', () => {
+            // The "user cleared the grid" path: a layer of nulls, not null, and
+            // no model run at all.
+            const perf = computePerfLayer({}, emptyGrid(7, 64), 120);
+
+            expect(humanizeSpy).not.toHaveBeenCalled();
+            expect(perf).toHaveLength(7);
+            expect(perf[0].every((cell) => cell === null)).toBe(true);
         });
 
         it('runs the model once per non-empty window and fills active cells', () => {
@@ -242,6 +280,18 @@ describe('grooveConvert', () => {
             expect(out[0][0].vel).toBe(0.7);
             expect(out[0][0].offsetSec).toBeCloseTo(0.04, 6); // 120/60 = 2x
             expect(out[1][1]).toBeNull();
+        });
+
+        it('does not emit Infinity offsets when the new bpm is zero', () => {
+            // bpm reaches this as a divisor straight from the URL. hashState now
+            // clamps to the transport range, so 0 can no longer arrive — this
+            // pins the reason that clamp exists.
+            const perf = createPerfLayer(1, 1);
+            perf[0][0] = { vel: 0.7, offsetSec: 0.02 };
+
+            const out = rescaleOffsets(perf, 120, 0);
+
+            expect(Number.isFinite(out[0][0].offsetSec)).toBe(true);
         });
     });
 });

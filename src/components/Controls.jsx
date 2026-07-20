@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Icon } from "./Icons";
 import HumanizeButton from "./HumanizeButton";
 import DrumKitButton from "./DrumKitButton";
+import { MIN_BPM, MAX_BPM, clampBpm } from "../data/sequencerConfig";
 
 const ACTION_DELAY_MS = 200;
 
@@ -51,7 +52,6 @@ export default function Controls({
         }, ACTION_DELAY_MS);
     }, [setAutoScroll]);
 
-    const clampBpm = useCallback((value) => Math.max(60, Math.min(240, value)), []);
 
     return (
         <div className="flex flex-row items-center gap-0 mb-2 p-0 short-landscape:mb-1">
@@ -88,8 +88,8 @@ export default function Controls({
                     <div className="tempo-input-wrapper h-8 w-auto">
                     <input
                             type="range"
-                            min="60"
-                            max="240"
+                            min={MIN_BPM}
+                            max={MAX_BPM}
                             value={bpm}
                             aria-label="Tempo"
                             aria-valuetext={`${bpm} BPM`}

@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { encodeGrid, decodeGrid, buildShareHash, parseShareHash, parseInitialHash } from './hashState';
+import { MIN_BPM, MAX_BPM, MAX_GRID_COLS } from '../data/sequencerConfig';
 
 describe('hashState', () => {
     describe('encodeGrid', () => {
@@ -30,8 +31,7 @@ describe('hashState', () => {
                 [false, false, false, false],
                 [false, false, false, false],
             ];
-            const encoded = encodeGrid(grid);
-            expect(encoded).toBeTruthy();
+            expect(encodeGrid(grid)).toBe('4.AA');
         });
 
         it('should encode a grid with all true values', () => {
@@ -39,8 +39,34 @@ describe('hashState', () => {
                 [true, true, true, true],
                 [true, true, true, true],
             ];
-            const encoded = encodeGrid(grid);
-            expect(encoded).toBeTruthy();
+            expect(encodeGrid(grid)).toBe('4._w');
+        });
+    });
+
+    // Every other test in this file round-trips the codec against itself, which
+    // cannot catch a change to the wire format: flip the bit order, swap the
+    // row/column nesting, or alter the URL-safe alphabet and all of them still
+    // pass while every link anyone has ever shared decodes to a different beat.
+    // These are frozen outputs. If one fails, the format changed — that is a
+    // breaking change to existing share links, not a test to update.
+    describe('wire format (golden vectors)', () => {
+        it.each([
+            ['a hit on row 0 step 0 and row 1 step 1', [[true, false, false, false], [false, true, false, false]], '4.hA'],
+            ['an empty two-row grid', [[false, false, false, false], [false, false, false, false]], '4.AA'],
+            ['a full two-row grid', [[true, true, true, true], [true, true, true, true]], '4._w'],
+            ['a four-on-the-floor sixteenth row', [[true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false]], '16.iIg'],
+        ])('encodes %s as the documented token', (_label, grid, expected) => {
+            expect(encodeGrid(grid)).toBe(expected);
+        });
+
+        it('decodes the documented tokens back to their grids', () => {
+            expect(decodeGrid('4.hA', 2)).toEqual([
+                [true, false, false, false],
+                [false, true, false, false],
+            ]);
+            expect(decodeGrid('16.iIg', 1)).toEqual([
+                [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+            ]);
         });
     });
 
@@ -82,6 +108,54 @@ describe('hashState', () => {
             expect(decoded[0][1]).toBe(false);
             expect(decoded[1][0]).toBe(false);
             expect(decoded[1][1]).toBe(true);
+        });
+    });
+
+    // The grid segment arrives from the address bar, so it has to survive being
+    // hand-edited, truncated by a chat client, or crafted. Every case here
+    // returns null rather than throwing: App.jsx calls parseInitialHash at
+    // module scope, outside React and outside ErrorBoundary, so anything that
+    // throws is a white screen with no recovery.
+    describe('decodeGrid rejects hostile input', () => {
+        it('returns null for a segment with no dot instead of throwing', () => {
+            // Regression: base64 was undefined here and `.replace` ran outside
+            // the try block. 'invalidgrid' survived only because parseInt gave
+            // NaN first — anything starting with a digit crashed the app.
+            expect(() => decodeGrid('4invalid', 2)).not.toThrow();
+            expect(decodeGrid('4invalid', 2)).toBeNull();
+        });
+
+        it('returns null for a column count with no payload at all', () => {
+            expect(decodeGrid('4.', 2)).toBeNull();
+            expect(decodeGrid('4', 2)).toBeNull();
+        });
+
+        it.each([
+            ['zero columns', '0.AAAA'],
+            ['negative columns', '-4.AAAA'],
+        ])('returns null for %s', (_label, encoded) => {
+            // These used to decode to a grid of empty rows, which renders as a
+            // sequencer with no steps at all.
+            expect(decodeGrid(encoded, 2)).toBeNull();
+        });
+
+        it('returns null for a column count past the cap rather than allocating it', () => {
+            // Unbounded, this allocated a 7 x 2,000,000 grid from a URL in a few
+            // hundred milliseconds. Larger values just hang the tab.
+            expect(decodeGrid(`${MAX_GRID_COLS + 1}.AA`, 7)).toBeNull();
+            expect(decodeGrid('2000000.AA', 7)).toBeNull();
+        });
+
+        it('accepts a column count exactly at the cap', () => {
+            const row = Array(MAX_GRID_COLS).fill(false);
+            const decoded = decodeGrid(encodeGrid([row]), 1);
+            expect(decoded[0]).toHaveLength(MAX_GRID_COLS);
+        });
+
+        it('returns null for a payload shorter than the grid it claims', () => {
+            // A truncated link used to pad with `false` and load as a valid but
+            // half-empty beat, which reads as the app losing the user's work.
+            expect(decodeGrid('4.AA', 3)).toBeNull();
         });
     });
 
@@ -271,6 +345,47 @@ describe('hashState', () => {
 
         it('returns null for an empty hash', () => {
             expect(parseInitialHash('', 2, SIGNATURES)).toBeNull();
+        });
+
+        // App.jsx:66 calls this at module scope — outside React, outside
+        // ErrorBoundary. A throw here is a white screen the user cannot recover
+        // from without knowing to edit the URL, so the contract is that any
+        // input at all returns null rather than throwing.
+        it.each([
+            ['a grid segment truncated mid-token', '#120|4/4|black-pearl|4invalid'],
+            ['a grid segment that is only a number', '#120|4/4|black-pearl|4'],
+            ['an absurd column count', '#120|4/4|black-pearl|2000000.AA'],
+            ['a payload shorter than the row count', '#120|4/4|black-pearl|4.AA'],
+            ['nothing but separators', '#|||'],
+        ])('never throws on %s', (_label, hash) => {
+            expect(() => parseInitialHash(hash, 7, SIGNATURES)).not.toThrow();
+            expect(parseInitialHash(hash, 7, SIGNATURES)).toBeNull();
+        });
+    });
+
+    describe('parseShareHash input handling', () => {
+        const gridFor = (rows, cols) => Array.from({ length: rows }, () => Array(cols).fill(false));
+
+        it('strips a leading # so window.location.hash can be passed straight in', () => {
+            // Every real caller passes window.location.hash, which always carries
+            // the '#', and nothing exercised that branch until now.
+            const grid = gridFor(2, 4);
+            const hash = buildShareHash({ bpm: 120, sigName: '4/4', grid });
+            expect(parseShareHash(`#${hash}`, 2)).toEqual(parseShareHash(hash, 2));
+        });
+
+        it.each([
+            ['below the transport minimum', '1', MIN_BPM],
+            ['zero, which would divide by zero in rescaleOffsets', '0', MIN_BPM],
+            ['above the transport maximum', '9000', MAX_BPM],
+            ['inside the range', '128', 128],
+        ])('clamps a bpm %s', (_label, raw, expected) => {
+            const parsed = parseShareHash(`${raw}|4/4|black-pearl|${encodeGrid(gridFor(2, 4))}|v1`, 2);
+            expect(parsed.bpm).toBe(expected);
+        });
+
+        it('returns null when the bpm is not a number at all', () => {
+            expect(parseShareHash('abc|4/4|black-pearl|4.AA|v1', 2)).toBeNull();
         });
     });
 });

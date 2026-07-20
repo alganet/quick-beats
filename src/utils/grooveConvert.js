@@ -8,7 +8,9 @@
 
 import { NUM_STEPS, NUM_CLASSES, DEPTH, humanize } from './grooveModel';
 
-const MAX_WINDOWS = 16; // 512 steps; guard against pathological grids
+// Exported so the share-link column cap (MAX_GRID_COLS in sequencerConfig) can
+// be pinned equal to MAX_WINDOWS * NUM_STEPS by test rather than by comment.
+export const MAX_WINDOWS = 16; // 512 steps; guard against pathological grids
 
 // GrooveConverter's 9 drum classes (order): kick, snare, closedHH, openHH,
 // lowTom, midTom, hiTom, crash, ride. quick-beats' 7 instrument rows
@@ -130,7 +132,17 @@ export const computePerfLayer = (backend, grid, bpm, onWindow) => {
  * seconds scale by oldBpm/newBpm). Returns a new layer; velocity unchanged.
  */
 export const rescaleOffsets = (perfLayer, oldBpm, newBpm) => {
-    const factor = oldBpm / newBpm;
+    // A zero or non-finite newBpm would turn every offset into Infinity, and an
+    // Infinity offset schedules a note that never sounds. hashState clamps the
+    // tempo it decodes from a share link, so this is belt and braces — but it is
+    // one comparison guarding the audio path, and the layer is better left
+    // unscaled than poisoned.
+    // 1 rather than an early `return perfLayer`, so the "returns a new layer"
+    // contract above holds on every path — handing back the caller's own array
+    // here would alias it into the engine and let a later edit of the result
+    // mutate the layer it was derived from.
+    const raw = oldBpm / newBpm;
+    const factor = Number.isFinite(raw) ? raw : 1;
     return perfLayer.map((row) =>
         row.map((cell) =>
             cell ? { vel: cell.vel, offsetSec: cell.offsetSec * factor } : null,

@@ -5,6 +5,29 @@
 // The zoom a fresh visitor lands on, and the ceiling auto-fit will pick up to.
 export const DEFAULT_ZOOM = 1;
 
+// The tempo range the transport is willing to run at. Lives here rather than in
+// Controls.jsx because the share-link decoder has to clamp to the same bounds:
+// a hash carrying bpm 0 used to reach rescaleOffsets as a divisor and produce
+// Infinity microtiming offsets.
+export const MIN_BPM = 60;
+export const MAX_BPM = 240;
+
+// One clamp, so the tempo control and the share-link decoder can never disagree
+// about what an in-range tempo is.
+export const clampBpm = (value) => Math.max(MIN_BPM, Math.min(MAX_BPM, value));
+
+// Ceiling on the step count a share link may decode to. cols arrives from an
+// untrusted URL and drives the decode loop, so without a bound a hand-edited
+// link allocates an arbitrarily large grid (2,000,000 columns is a few hundred
+// milliseconds and hundreds of MB; larger just hangs the tab).
+//
+// 512 is the ceiling humanization already imposes — MAX_WINDOWS * WINDOW_STEPS
+// in grooveConvert — and is ~32 bars of 4/4, well past anything the UI can build
+// by hand. Deriving it by import would invert the layering (data importing
+// utils), so the two are pinned equal by a test in grooveConvert.test.js instead
+// of by a comment nothing enforces.
+export const MAX_GRID_COLS = 512;
+
 export const ZOOM_CONFIG = {
     0: { // Small
         cellWidth: 20, // w-5

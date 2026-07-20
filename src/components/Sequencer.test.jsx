@@ -6,6 +6,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Sequencer from './Sequencer';
 import { INSTRUMENTS } from '../data/kit';
+import { stepToX, getGridOriginOffsetPx } from '../utils/sequencerGeometry';
 // import the hook here so we can access the mocked function later
 import { useAutoScroll } from '../hooks/useAutoScroll';
 
@@ -73,9 +74,13 @@ vi.mock('../hooks/useSequencerSelection', () => ({
     })
 }));
 
+// Mirrors the real three zoom levels rather than a single invented one, so the
+// seek tests below can assert the coordinate mapping at more than one cell size.
 vi.mock('../data/sequencerConfig', () => ({
     ZOOM_CONFIG: {
-        1: { cellWidth: 32, gap: 4, groupGap: 8 }
+        0: { cellWidth: 20, gap: 2, groupGap: 6 },
+        1: { cellWidth: 32, gap: 4, groupGap: 12 },
+        2: { cellWidth: 40, gap: 4, groupGap: 16 }
     }
 }));
 
@@ -141,23 +146,71 @@ describe('Sequencer', () => {
         expect(screen.getByTestId('mock-measure-controls')).toBeInTheDocument();
     });
 
-    it('handles seek functionality and stops playback when playing', () => {
-        // When playing, seeking should setStep and togglePlay (to stop)
-        render(<Sequencer {...defaultProps} isPlaying={true} />);
-        const header = screen.getByTestId('mock-header');
+    describe('seeking from a click', () => {
+        // The x the user clicks is offset by the instrument-label gutter before
+        // it becomes a step. Deriving the click position from the real geometry
+        // helpers — rather than hardcoding pixels — means these assert the
+        // wiring (gutter subtracted, stepCount/grouping/zoom passed through)
+        // without restating the layout constants a second time.
+        const clientXForStep = (step, zoom) =>
+            getGridOriginOffsetPx(false) + stepToX(step, defaultProps.grouping, zoom) + 2;
 
-        fireEvent.click(header, { clientX: 100 });
-        expect(defaultProps.setStep).toHaveBeenCalled();
-        expect(defaultProps.togglePlay).toHaveBeenCalled();
-    });
+        it.each([
+            ['the first step', 0],
+            ['a step inside the first group', 2],
+            ['the step just past a group gap', 4],
+            ['a step several groups in', 11],
+        ])('maps a click on %s to that step', (_label, step) => {
+            render(<Sequencer {...defaultProps} zoom={1} />);
 
-    it('handles seek functionality when not playing', () => {
-        render(<Sequencer {...defaultProps} isPlaying={false} />);
-        const header = screen.getByTestId('mock-header');
+            fireEvent.click(screen.getByTestId('mock-header'), { clientX: clientXForStep(step, 1) });
 
-        fireEvent.click(header, { clientX: 100 });
-        expect(defaultProps.setStep).toHaveBeenCalled();
-        expect(defaultProps.togglePlay).not.toHaveBeenCalled();
+            expect(defaultProps.setStep).toHaveBeenCalledWith(step);
+        });
+
+        it('maps the same click to a different step at a different zoom', () => {
+            // Guards against the zoom prop being dropped on the way to xToStep:
+            // at zoom 0 the cells are narrower, so one x lands further along.
+            render(<Sequencer {...defaultProps} zoom={0} />);
+
+            fireEvent.click(screen.getByTestId('mock-header'), { clientX: clientXForStep(7, 0) });
+
+            expect(defaultProps.setStep).toHaveBeenCalledWith(7);
+        });
+
+        it('clamps a click left of the grid to the first step', () => {
+            render(<Sequencer {...defaultProps} />);
+
+            fireEvent.click(screen.getByTestId('mock-header'), { clientX: 0 });
+
+            expect(defaultProps.setStep).toHaveBeenCalledWith(0);
+        });
+
+        it('clamps a click past the end to the last step', () => {
+            render(<Sequencer {...defaultProps} />);
+
+            fireEvent.click(screen.getByTestId('mock-header'), { clientX: 100000 });
+
+            expect(defaultProps.setStep).toHaveBeenCalledWith(defaultProps.stepCount - 1);
+        });
+
+        it('stops playback when seeking mid-playback', () => {
+            render(<Sequencer {...defaultProps} isPlaying={true} />);
+
+            fireEvent.click(screen.getByTestId('mock-header'), { clientX: clientXForStep(3, 1) });
+
+            expect(defaultProps.setStep).toHaveBeenCalledWith(3);
+            expect(defaultProps.togglePlay).toHaveBeenCalled();
+        });
+
+        it('leaves a stopped transport stopped', () => {
+            render(<Sequencer {...defaultProps} isPlaying={false} />);
+
+            fireEvent.click(screen.getByTestId('mock-header'), { clientX: clientXForStep(3, 1) });
+
+            expect(defaultProps.setStep).toHaveBeenCalledWith(3);
+            expect(defaultProps.togglePlay).not.toHaveBeenCalled();
+        });
     });
 
     it('passes toggleStep to instrument rows', () => {

@@ -235,6 +235,106 @@ describe('useHumanizeLifecycle', () => {
             expect(props.setPerfLayer).toHaveBeenCalledWith(RESCALED);
             expect(props.humanize.compute).toHaveBeenCalledTimes(1); // no recompute
         });
+
+        it('rescales a layer that lands after the tempo already moved', async () => {
+            // The genuine race: offsets come back in seconds for the bpm the
+            // compute started at. Drag the tempo slider while the worker runs and
+            // an unrescaled layer puts every hit at the wrong moment.
+            let resolveCompute;
+            const humanize = makeHumanize({
+                compute: vi.fn(() => new Promise((resolve) => { resolveCompute = resolve; })),
+            });
+            const props = makeProps({ humanize });
+            const { result, rerender } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: props });
+
+            act(() => { result.current.humanizeAction(); }); // starts at 120
+            rerender({ ...props, bpmInput: 140 }); // ...and the user moves the slider
+            await act(async () => { resolveCompute(LAYER); });
+
+            expect(rescaleOffsets).toHaveBeenCalledWith(LAYER, 120, 140);
+            expect(props.setPerfLayer).toHaveBeenCalledWith(RESCALED);
+        });
+    });
+
+    describe('streaming partials', () => {
+        // The whole reason compute takes an onPartial callback: a multi-bar beat
+        // humanizes bar by bar instead of sitting still until the last window
+        // lands. Every other test passes expect.any(Function) and never calls it.
+        const partialOf = (props) => props.humanize.compute.mock.calls[0][2];
+
+        it('applies each partial to the engine as it streams in', async () => {
+            const props = makeProps();
+            const { result } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: props });
+
+            act(() => { result.current.humanizeAction(); });
+            props.setPerfLayer.mockClear();
+
+            const onPartial = partialOf(props);
+            act(() => { onPartial({ id: 'bar-1' }); });
+            expect(props.setPerfLayer).toHaveBeenLastCalledWith({ id: 'bar-1' });
+
+            act(() => { onPartial({ id: 'bar-2' }); });
+            expect(props.setPerfLayer).toHaveBeenLastCalledWith({ id: 'bar-2' });
+            expect(props.setPerfLayer).toHaveBeenCalledTimes(2);
+        });
+
+        it('tints the pads from the streamed partial, not only the final layer', async () => {
+            const props = makeProps();
+            const { result } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: props });
+
+            act(() => { result.current.humanizeAction(); });
+            act(() => { partialOf(props)({ id: 'bar-1' }); });
+
+            expect(result.current.humanizedLayer).toEqual({ id: 'bar-1' });
+
+            await flush();
+            expect(result.current.humanizedLayer).toEqual(LAYER);
+        });
+
+        it('ignores a null partial', () => {
+            const props = makeProps();
+            const { result } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: props });
+
+            act(() => { result.current.humanizeAction(); });
+            props.setPerfLayer.mockClear();
+
+            act(() => { partialOf(props)(null); });
+
+            expect(props.setPerfLayer).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('humanizedLayer', () => {
+        it('is null before anything has been humanized', () => {
+            const { result } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: makeProps() });
+            expect(result.current.humanizedLayer).toBeNull();
+        });
+
+        it('holds the applied layer once humanize lands', async () => {
+            const props = makeProps();
+            const { result } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: props });
+
+            act(() => { result.current.humanizeAction(); });
+            await flush();
+
+            expect(result.current.humanizedLayer).toEqual(LAYER);
+        });
+
+        it('is cleared when the time signature changes', async () => {
+            // A layer computed for 4/4 describes steps that no longer exist in
+            // 3/4, so the reset has to drop the pad tint too — not just the
+            // engine layer.
+            const props = makeProps();
+            const { result, rerender } = renderHook((p) => useHumanizeLifecycle(p), { initialProps: props });
+
+            act(() => { result.current.humanizeAction(); });
+            await flush();
+            expect(result.current.humanizedLayer).toEqual(LAYER);
+
+            rerender({ ...props, timeSignature: SIG_34 });
+
+            expect(result.current.humanizedLayer).toBeNull();
+        });
     });
 
     it('applies the humanize style options to the engine once', () => {

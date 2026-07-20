@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: ISC
 
+import { clampBpm, MAX_GRID_COLS } from '../data/sequencerConfig';
+
 export const encodeGrid = (grid) => {
     if (!grid || !grid.length) return "";
     const rows = grid.length;
@@ -38,7 +40,16 @@ export const decodeGrid = (encoded, expectedRows) => {
     if (!encoded) return null;
     const [colsStr, base64] = encoded.split('.');
     const cols = parseInt(colsStr);
-    if (isNaN(cols)) return null;
+
+    // Everything below runs on a string pulled straight out of the URL, so it
+    // has to survive being hand-edited or truncated. This guard used to be just
+    // the isNaN check, and the `base64.replace` two lines down sat outside the
+    // try block: a segment with no '.' at all left base64 undefined and threw a
+    // TypeError instead of returning null. App.jsx calls parseInitialHash at
+    // module scope, outside React and outside any error boundary, so that threw
+    // before anything could catch it — a truncated share link was a white screen.
+    if (Number.isNaN(cols) || cols < 1 || cols > MAX_GRID_COLS) return null;
+    if (typeof base64 !== 'string' || !base64) return null;
 
     // Restore Base64
     let b64 = base64.replace(/-/g, '+').replace(/_/g, '/');
@@ -56,6 +67,12 @@ export const decodeGrid = (encoded, expectedRows) => {
         for (let i = 0; i < bytes.length; i++) {
             binary += bytes[i].toString(2).padStart(8, '0');
         }
+
+        // A payload shorter than the grid it claims to describe is a truncated
+        // link. Reading past the end yields `undefined === "1"` — false — so it
+        // used to decode as a valid but silently half-empty beat, which looks
+        // like the app losing the user's work rather than like a broken URL.
+        if (binary.length < expectedRows * cols) return null;
 
         const grid = [];
         for (let r = 0; r < expectedRows; r++) {
@@ -86,8 +103,13 @@ export const parseShareHash = (hash, expectedRows) => {
     const parts = raw.split('|');
     if (parts.length < 3) return null; // must contain at least bpm and signature
 
-    const bpm = parseInt(parts[0], 10);
-    if (Number.isNaN(bpm)) return null;
+    const parsedBpm = parseInt(parts[0], 10);
+    if (Number.isNaN(parsedBpm)) return null;
+    // Clamped rather than rejected: a tempo outside the transport's range is no
+    // reason to throw away an otherwise good beat, and the UI clamps to exactly
+    // these bounds anyway. bpm 0 in particular reaches rescaleOffsets as a
+    // divisor and turns every microtiming offset into Infinity.
+    const bpm = clampBpm(parsedBpm);
 
     const sigName = parts[1];
 

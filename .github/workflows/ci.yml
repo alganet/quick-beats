@@ -50,8 +50,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # test:coverage runs the same suite and additionally fails on a threshold
+      # miss (see the coverage block in vite.config.js), so the gate needs no
+      # separate step. Kept named "Test" so branch protection keyed on it holds.
       - name: Test
-        run: npm test
+        run: npm run test:coverage
+
+      # Uploaded even on failure — a red build is exactly when the report is
+      # worth reading.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
 
   build:
     runs-on: ubuntu-latest

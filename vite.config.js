@@ -252,6 +252,41 @@ export default defineConfig(({ command, mode }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.js',
       include: ['src/**/*.{test,spec}.{js,jsx}'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'html', 'lcov', 'json-summary'],
+        // Untested modules must count as 0% rather than vanish from the report —
+        // finding what isn't covered is the entire point of the number.
+        all: true,
+        include: ['src/**/*.{js,jsx}'],
+        exclude: [
+          'src/**/*.{test,spec}.{js,jsx}',
+          'src/test/**',   // setup + the service worker harness
+          'src/wasm/**',   // AssemblyScript build output, gitignored
+          'src/main.jsx',  // the ReactDOM mount; nothing to assert
+        ],
+        // public/sw.js is deliberately absent: it lives outside src/, and the
+        // suite loads it by evaluating its source (see serviceWorkerHarness.js),
+        // which v8 cannot instrument. It is thoroughly covered by src/test/sw.test.js
+        // and will always read 0% here — adding public/ to `include` would not
+        // measure it, only drag the global number down permanently.
+        //
+        // Global rather than per-file thresholds: per-file fails on data modules
+        // that are mostly literals (src/data/kit.js) and on presentational
+        // components, which turns the gate into noise. Numbers are the measured
+        // baseline floored to the nearest 5, so this fails on a regression rather
+        // than on the day it was added.
+        // Measured 2026-07-20: 94.5 lines / 92.9 functions / 82.9 branches /
+        // 92.6 statements. Raise these as coverage climbs; never lower one to
+        // make a red build green.
+        thresholds: {
+          lines: 90,
+          functions: 90,
+          branches: 80,
+          statements: 90,
+          autoUpdate: false,
+        },
+      },
     },
   }
 })

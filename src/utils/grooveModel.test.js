@@ -67,6 +67,16 @@ const loadWeightsFromFs = () => {
     return weights;
 };
 
+// The suite below is skipped when the weights are missing, which keeps a
+// sparse local checkout usable — but it also means a CI run that lost them
+// would silently shrink to the handful of arithmetic tests above and still go
+// green, with the entire model unverified. In CI their absence is a failure.
+describe.runIf(process.env.CI)('GrooVAE weights availability', () => {
+    it('ships the committed weights, so the integration suite below actually runs', () => {
+        expect(hasWeights).toBe(true);
+    });
+});
+
 describe.skipIf(!hasWeights)('grooveModel + real GrooVAE weights', () => {
     let weights;
     let out;
