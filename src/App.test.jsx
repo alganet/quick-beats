@@ -65,11 +65,12 @@ vi.mock('./components/Sequencer', () => ({
 }));
 
 vi.mock('./components/Controls', () => ({
-    default: ({ isPlaying, togglePlay, setBpm, humanizeStatus, onHumanize }) => (
+    default: ({ isPlaying, togglePlay, setBpm, humanizeStatus, onHumanize, onSelectKit }) => (
         <div data-testid="mock-controls">
             <button onClick={togglePlay}>{isPlaying ? 'Stop' : 'Play'}</button>
             <input data-testid="bpm-input" onChange={(e) => setBpm(parseInt(e.target.value))} />
             <button data-testid="humanize-btn" data-status={humanizeStatus} onClick={onHumanize}>Humanize</button>
+            <button data-testid="select-kit-btn" onClick={() => onSelectKit('red-zeppelin')}>Switch Kit</button>
         </div>
     )
 }));
@@ -405,7 +406,9 @@ describe('App', () => {
         mockUseSamplePreload.progress = 0.3;
         renderWith44();
         // The loading screen gates the UX and the 8MB model waits its turn.
-        expect(screen.getByRole('status')).toHaveAttribute('aria-label', expect.stringMatching(/loading sounds/i));
+        // (The announcer's empty status region also mounts here, hence getAll.)
+        const statuses = screen.getAllByRole('status');
+        expect(statuses.some((el) => /loading sounds/i.test(el.getAttribute('aria-label') ?? ''))).toBe(true);
         expect(screen.queryByTestId('mock-sequencer')).not.toBeInTheDocument();
         expect(mockUseHumanize.warmup).not.toHaveBeenCalled();
     });
@@ -777,6 +780,79 @@ describe('App', () => {
         // Remove Measure
         fireEvent.click(screen.getByTestId('remove-measure-btn'));
         expect(countSpan).toHaveTextContent('16');
+    });
+
+    it('announces measure add and remove to screen readers', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // 4/4 starts at one measure (16 steps); adding takes it to two.
+        fireEvent.click(screen.getByTestId('add-measure-btn'));
+        expect(screen.getByText('Measure added, 2 total')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('remove-measure-btn'));
+        expect(screen.getByText('Measure 1 removed')).toBeInTheDocument();
+    });
+
+    it('announces a kit switch: loading then ready', async () => {
+        mockUseAudio.isLoaded = true;
+        mockUseAudio.loadKit.mockResolvedValueOnce('ok');
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        fireEvent.click(screen.getByTestId('select-kit-btn'));
+        expect(screen.getByText('Loading Red Zeppelin…')).toBeInTheDocument();
+        expect(await screen.findByText('Red Zeppelin ready')).toBeInTheDocument();
+    });
+
+    it('announces a kit-load failure assertively', async () => {
+        // loadKit never rejects — the gapless contract keeps the old kit
+        // playing on a sample failure — so failure arrives as a resolved
+        // outcome, not an exception.
+        mockUseAudio.isLoaded = true;
+        mockUseAudio.loadKit.mockResolvedValueOnce('failed');
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        fireEvent.click(screen.getByTestId('select-kit-btn'));
+        const alert = await screen.findByText('Could not load Red Zeppelin');
+        expect(alert.closest('[role="alert"]')).toBeInTheDocument();
+    });
+
+    it('does not claim a superseded kit switch is ready', async () => {
+        // Click kit A, then quickly kit B: A resolves 'superseded' and must
+        // stay silent — only B's own announcements should be heard.
+        mockUseAudio.isLoaded = true;
+        mockUseAudio.loadKit.mockResolvedValueOnce('superseded');
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        fireEvent.click(screen.getByTestId('select-kit-btn'));
+        expect(screen.getByText('Loading Red Zeppelin…')).toBeInTheDocument();
+        await act(async () => {});
+        expect(screen.queryByText('Red Zeppelin ready')).not.toBeInTheDocument();
+        expect(screen.queryByText('Could not load Red Zeppelin')).not.toBeInTheDocument();
+    });
+
+    it('announces humanize turning on and off', async () => {
+        mockUseAudio.isLoaded = true;
+        // Resolve a real layer so the run finishes and the status reaches 'on'.
+        mockUseHumanize.compute.mockResolvedValueOnce({ mock: true });
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        // Toggling humanize is otherwise only signalled by the button lighting.
+        fireEvent.click(screen.getByTestId('humanize-btn'));
+        expect(await screen.findByText('Humanized')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('humanize-btn'));
+        expect(screen.getByText('Humanize removed')).toBeInTheDocument();
     });
 
     it('toggles steps via Sequencer cb', () => {

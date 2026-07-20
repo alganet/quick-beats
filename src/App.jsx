@@ -8,6 +8,7 @@ import { useAudio } from './hooks/useAudio'
 import { useHumanize } from './hooks/useHumanize'
 import { useSamplePreload } from './hooks/useSamplePreload'
 import { useHistoryState } from './hooks/useHistoryState'
+import { useAnnouncer } from './hooks/useAnnouncer'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useHumanizeLifecycle } from './hooks/useHumanizeLifecycle'
 import { useLandscapeLock } from './hooks/useLandscapeLock'
@@ -87,19 +88,36 @@ function App() {
   const [switchingKit, setSwitchingKit] = useState(null);
   const [kitProgress, setKitProgress] = useState(0);
 
+  // Shared screen-reader announcer for status changes with no focus move (kit
+  // load, humanize, measure add/remove) — see useAnnouncer.
+  const { polite: announcePolite, assertive: announceAssertive, announce, announceError } = useAnnouncer();
+
   const handleSelectKit = useCallback(async (kitId) => {
     // Ignore the kit already playing, the one already mid-switch (a second click
     // would restart its download and reset progress), and unknown ids.
     if (kitId === activeKit || kitId === switchingKit || !KITS[kitId]) return;
+    const kitName = KITS[kitId]?.name ?? 'kit';
     setSwitchingKit(kitId);
     setKitProgress(0);
+    // A cold kit download can take seconds with only a visual progress ring;
+    // announce the start and finish so a non-sighted user knows it happened.
+    // loadKit never rejects (the gapless contract swallows sample failures and
+    // keeps the old kit playing), so the truth is in the resolved outcome:
+    // announce 'ok' and 'failed', stay silent on 'superseded' — the newer
+    // switch announces itself. The catch is only a belt-and-braces net for a
+    // bug in loadKit itself.
+    announce(`Loading ${kitName}…`);
     try {
-      await loadKit(kitId, setKitProgress);
+      const outcome = await loadKit(kitId, setKitProgress);
+      if (outcome === 'ok') announce(`${kitName} ready`);
+      else if (outcome === 'failed') announceError(`Could not load ${kitName}`);
+    } catch {
+      announceError(`Could not load ${kitName}`);
     } finally {
       // Only clear if a newer switch hasn't already taken over (last-wins).
       setSwitchingKit((prev) => (prev === kitId ? null : prev));
     }
-  }, [activeKit, switchingKit, loadKit]);
+  }, [activeKit, switchingKit, loadKit, announce, announceError]);
 
   const [isSetup, setIsSetup] = useState(_initialHash?.success ? true : false);
   // Seed the modals from a deep link (#help / #help~beat / #share~beat).
@@ -182,6 +200,22 @@ function App() {
     setHumanizeOptions,
     humanize,
   });
+
+  // Announce humanize transitions — the button lights up but nothing is spoken.
+  // Off/computing/pending/on come from useHumanizeLifecycle; we speak the ones a
+  // user acts on. Navigation away (status -> 'unavailable') is deliberately
+  // silent so leaving the sequencer doesn't announce a "removal".
+  const prevHumanizeStatusRef = useRef(humanizeStatus);
+  useEffect(() => {
+    const prev = prevHumanizeStatusRef.current;
+    if (prev === humanizeStatus) return;
+    prevHumanizeStatusRef.current = humanizeStatus;
+    const wasActive = prev === 'on' || prev === 'computing' || prev === 'pending';
+    if (humanizeStatus === 'computing') announce('Humanizing…');
+    else if (humanizeStatus === 'on') announce('Humanized');
+    else if (humanizeStatus === 'off' && wasActive) announce('Humanize removed');
+    else if (humanizeStatus === 'error' && prev !== 'error') announceError('Humanize failed');
+  }, [humanizeStatus, announce, announceError]);
 
   // Which named overlay is open, if any — the modals are mutually exclusive, so
   // one slot captures the whole set. Mirrored into a ref so the imperative close
@@ -341,25 +375,52 @@ function App() {
       playNote(INSTRUMENTS[row]);
     }
   }, [timeSignature, playNote]);
+  // Measures = total steps / steps-per-measure; used to announce the new count
+  // since the grid grows/shrinks silently under the add/delete controls.
+  const stepsPerMeasure = timeSignature ? timeSignature.beats * timeSignature.stepsPerBeat : 0;
+
   const addMeasure = () => {
     setGrid(prevGrid => calculateNewMeasure(prevGrid, timeSignature));
+    if (stepsPerMeasure && grid[0]) {
+      announce(`Measure added, ${grid[0].length / stepsPerMeasure + 1} total`);
+    }
   };
 
   const removeMeasure = (measureIndex) => {
     setGrid(prevGrid => calculateGridWithRemovedMeasure(prevGrid, measureIndex, timeSignature));
+    announce(`Measure ${measureIndex + 1} removed`);
   };
+
+  // Screen-reader live regions for the shared announcer. Mounted in every
+  // rendered branch (kit switching happens on the Setup screen too) so an
+  // announcement always has a live node to land in.
+  const announcerRegions = (
+    <>
+      <div className="sr-only" role="status" aria-live="polite">{announcePolite}</div>
+      <div className="sr-only" role="alert" aria-live="assertive">{announceAssertive}</div>
+    </>
+  );
 
   // Gate all UX until the drum samples are warm in the HTTP cache so the first
   // Play/preview gesture decodes from cache instead of stalling on the network.
-  // Covers the hash-restore path (isSetup starts true) too.
+  // Covers the hash-restore path (isSetup starts true) too. The announcer nodes
+  // ride along even here: every hook above is live (a share link tapped in an
+  // installed PWA can trigger a kit announcement mid-preload), and text already
+  // present when a live region first mounts is never spoken.
   if (!assetsReady) {
-    return <LoadingScreen progress={assetsProgress} />;
+    return (
+      <>
+        {announcerRegions}
+        <LoadingScreen progress={assetsProgress} />
+      </>
+    );
   }
 
   if (!isSetup) {
     return (
       <>
         <IconSprite />
+        {announcerRegions}
         <Help
           isOpen={isHelpOpen}
           onClose={closeOverlay}
@@ -385,6 +446,7 @@ function App() {
   return (
     <div className="bg-surface-1 h-dvh safe-inset flex flex-col text-fg overflow-hidden w-fit max-w-screen">
       <IconSprite />
+      {announcerRegions}
       {/* Screen-reader announcement of transport state (visually hidden). */}
       <div className="sr-only" role="status" aria-live="polite">{isPlaying ? 'Playing' : 'Paused'}</div>
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -68,14 +68,19 @@ export function useAudio(initialKitId = DEFAULT_KIT_ID) {
     // keeps sounding while the new samples download + decode, and is only swapped
     // out — and disposed — once the new chains are ready. Concurrent switches are
     // last-wins via switchTokenRef. `onProgress(0..1)` mirrors the prefetch.
+    //
+    // Never rejects — every failure keeps the current kit playing — so the
+    // outcome is the resolved value: 'ok' (the kit is installed and sounding),
+    // 'failed' (a sample refused to load; the old kit kept playing), or
+    // 'superseded' (a newer switch overtook this one, which announces itself).
     const loadKit = useCallback(async (kitId, onProgress) => {
         const kit = KITS[kitId];
-        if (!kit) return;
+        if (!kit) return 'failed';
 
         // Already on this kit and loaded: nothing to do.
         if (kitId === activeKitRef.current && isLoadedRef.current) {
             onProgress?.(1);
-            return;
+            return 'ok';
         }
 
         const token = ++switchTokenRef.current;
@@ -83,7 +88,7 @@ export function useAudio(initialKitId = DEFAULT_KIT_ID) {
         // Warm the HTTP cache first — this is what drives the 0..1 progress. The
         // build below then decodes from cache, fast. Old players stay live.
         await prefetchKitSamples(kitId, onProgress);
-        if (token !== switchTokenRef.current) return; // superseded mid-download
+        if (token !== switchTokenRef.current) return 'superseded'; // mid-download
 
         const chains = buildChains(kit);
         try {
@@ -93,13 +98,13 @@ export function useAudio(initialKitId = DEFAULT_KIT_ID) {
             // current one playing (the gapless contract). Never leak the new nodes,
             // and never let the rejection escape to wedge togglePlay/handleSelectKit.
             disposeChains(chains);
-            return;
+            return 'failed';
         }
 
         // A newer switch started while we decoded, or we unmounted — drop ours.
         if (token !== switchTokenRef.current || !mountedRef.current) {
             disposeChains(chains);
-            return;
+            return 'superseded';
         }
 
         // Atomic swap: install the new kit, then dispose the previous one so the
@@ -113,6 +118,7 @@ export function useAudio(initialKitId = DEFAULT_KIT_ID) {
         setIsLoaded(true);
         isLoadedRef.current = true;
         onProgress?.(1);
+        return 'ok';
     }, [buildChains, disposeChains]);
 
     // Ensure players are cleaned up on unmount. Kit loading is done lazily
