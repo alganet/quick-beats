@@ -29,7 +29,7 @@ function MiniPad({ active, clearing, className = '' }) {
     );
 }
 
-export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, singleKeyShortcuts = true, onToggleSingleKeyShortcuts }) {
+export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, singleKeyShortcuts = true, onToggleSingleKeyShortcuts, showIosInstallHint = false }) {
     const [demoZoom, setDemoZoom] = useState(1);
     const dialogRef = useDialog(isOpen, onClose);
 
@@ -56,6 +56,22 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                         Close [ESC]
                     </button>
                 </div>
+
+                {/* iOS install hint — iOS Safari never fires beforeinstallprompt,
+                    so there's no header Install button; walk the user through the
+                    manual Add-to-Home-Screen flow instead. */}
+                {showIosInstallHint && (
+                    <HelpSection title="Install app">
+                        <div className="flex items-center gap-3">
+                            <Icon id="install" className="w-6 h-6 text-primary flex-shrink-0" />
+                            <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
+                                Tap the <span className="text-fg">Share</span> button in Safari, then
+                                choose <span className="text-fg">Add to Home Screen</span> to install
+                                Quick Beats. It then runs full-screen and works offline.
+                            </p>
+                        </div>
+                    </HelpSection>
+                )}
 
                 {/* Keyboard cheatsheet (only for pointer: fine) */}
                 {showKeyboardCheatsheet && (

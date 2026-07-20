@@ -27,6 +27,15 @@ describe('Help', () => {
         expect(screen.queryByText('Keyboard Shortcuts')).not.toBeInTheDocument();
     });
 
+    it('shows the iOS add-to-home-screen hint only when asked', () => {
+        const { rerender } = render(<Help isOpen={true} onClose={() => {}} />);
+        expect(screen.queryByText('Install app')).not.toBeInTheDocument();
+
+        rerender(<Help isOpen={true} onClose={() => {}} showIosInstallHint={true} />);
+        expect(screen.getByText('Install app')).toBeInTheDocument();
+        expect(screen.getByText(/Add to Home Screen/i)).toBeInTheDocument();
+    });
+
     it('returns null when not open', () => {
         const { container } = render(<Help isOpen={false} onClose={() => {}} />);
         expect(container.firstChild).toBeNull();

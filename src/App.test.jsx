@@ -731,6 +731,38 @@ describe('App', () => {
         expect(screen.getByTestId('mock-help')).toBeInTheDocument();
     });
 
+    it('surfaces an Install button once the browser offers to install', () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        expect(screen.queryByTitle('Install app')).not.toBeInTheDocument();
+        act(() => {
+            window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), {
+                prompt: vi.fn().mockResolvedValue(undefined),
+                userChoice: Promise.resolve({ outcome: 'accepted' }),
+            }));
+        });
+        expect(screen.getByTitle('Install app')).toBeInTheDocument();
+    });
+
+    it('clicking Install triggers the browser prompt and hides the button', async () => {
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        fireEvent.click(screen.getByText('Select 4/4'));
+        fireEvent.click(screen.getByText('Start'));
+
+        const evt = Object.assign(new Event('beforeinstallprompt'), {
+            prompt: vi.fn().mockResolvedValue(undefined),
+            userChoice: Promise.resolve({ outcome: 'accepted' }),
+        });
+        act(() => { window.dispatchEvent(evt); });
+        fireEvent.click(screen.getByTitle('Install app'));
+        expect(evt.prompt).toHaveBeenCalled();
+        await waitFor(() => expect(screen.queryByTitle('Install app')).not.toBeInTheDocument());
+    });
+
     it('shares the clean beat link, without the overlay marker', () => {
         mockUseAudio.isLoaded = true;
         render(<App />);

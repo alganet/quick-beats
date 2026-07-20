@@ -9,6 +9,7 @@ import { useHumanize } from './hooks/useHumanize'
 import { useSamplePreload } from './hooks/useSamplePreload'
 import { useHistoryState } from './hooks/useHistoryState'
 import { useAnnouncer } from './hooks/useAnnouncer'
+import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useHumanizeLifecycle } from './hooks/useHumanizeLifecycle'
 import { useLandscapeLock } from './hooks/useLandscapeLock'
@@ -91,6 +92,12 @@ function App() {
   // Shared screen-reader announcer for status changes with no focus move (kit
   // load, humanize, measure add/remove) — see useAnnouncer.
   const { polite: announcePolite, assertive: announceAssertive, announce, announceError } = useAnnouncer();
+
+  // PWA install: surface the browser's install prompt as a header action, detect
+  // the installed (standalone) state, and give iOS its manual A2HS hint.
+  const { canInstall, promptInstall, isStandalone, isIOS } = useInstallPrompt({
+    onInstalled: () => announce('App installed'),
+  });
 
   const handleSelectKit = useCallback(async (kitId) => {
     // Ignore the kit already playing, the one already mid-switch (a second click
@@ -427,6 +434,7 @@ function App() {
           showKeyboardCheatsheet={showKeyboardCheatsheet}
           singleKeyShortcuts={singleKeyShortcuts}
           onToggleSingleKeyShortcuts={() => setSingleKeyShortcuts((v) => !v)}
+          showIosInstallHint={isIOS && !isStandalone}
         />
         <Setup
           onSelect={handlePreview}
@@ -488,6 +496,19 @@ function App() {
                   <Icon id={rotate.isFullscreen ? 'fullscreen-exit' : 'fullscreen'} className="w-3 h-3" />
                 </button>
               )}
+              {/* Only when the browser has offered an install prompt and we're not
+                  already running installed. iOS never fires it — those users get
+                  the manual A2HS hint in Help instead. */}
+              {canInstall && !isStandalone && (
+                <button
+                  onClick={promptInstall}
+                  className={HEADER_ACTION_CLASS}
+                  title="Install app"
+                  aria-label="Install app"
+                >
+                  <Icon id="install" className="w-3 h-3" /> Install
+                </button>
+              )}
               <button
                 onClick={toggleTheme}
                 className={HEADER_ACTION_CLASS}
@@ -526,6 +547,7 @@ function App() {
           showKeyboardCheatsheet={showKeyboardCheatsheet}
           singleKeyShortcuts={singleKeyShortcuts}
           onToggleSingleKeyShortcuts={() => setSingleKeyShortcuts((v) => !v)}
+          showIosInstallHint={isIOS && !isStandalone}
         />
 
         <ShareModal
