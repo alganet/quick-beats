@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: 2026 Alexandre Gomes Gaigalas <alganet@gmail.com>
+#
+# SPDX-License-Identifier: ISC
+
+# Every push to main lands on the beta channel, so main is always testable on a
+# real device — installed, over HTTPS, with a live service worker — without
+# anything reaching stable users. Stable moves only on a pushed v* tag; see
+# deploy.yml.
+#
+# Deliberately not gated on lint or tests: beta is where broken things go to be
+# found, and ci.yml already reports on every push to main. A build failure here
+# just means no new beta.
+name: Deploy beta channel
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      # npm run build, never npx vite build: the prebuild hook regenerates the
+      # icon sprite and compiles the AssemblyScript wasm, and skipping it ships a
+      # stale sprite and a missing groove.wasm.
+      - name: Build beta
+        run: npm run build
+        env:
+          QB_CHANNEL: beta
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=quick-beats-beta

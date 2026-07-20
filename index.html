@@ -17,16 +17,9 @@ SPDX-License-Identifier: ISC
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Quick Beats" />
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-087KLX3WP7"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-
-    gtag('config', 'G-087KLX3WP7');
-  </script>
+  <!-- apple-mobile-web-app-title, the robots directive and the analytics tag are
+       injected per release channel by channelHtml in vite.config.js: they differ
+       between stable and beta, and only a real build should carry them. -->
 </head>
 
 <body>

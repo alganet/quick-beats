@@ -54,6 +54,13 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  // The Vite config runs in Node too — process.env carries the release channel.
+  {
+    files: ['vite.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
   // Test files configuration
   {
     files: ['**/*.test.{js,jsx}', 'src/test/**/*.js'],
