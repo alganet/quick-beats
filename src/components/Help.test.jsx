@@ -20,6 +20,11 @@ describe('Help', () => {
         // Two rows now document Play / Pause: the p key and Space.
         expect(screen.getAllByText('Play / Pause')).toHaveLength(2);
         expect(screen.getByText('Toggle zoom')).toBeInTheDocument();
+        // The previously-undocumented shortcuts that actually exist.
+        expect(screen.getByText('First step')).toBeInTheDocument();
+        expect(screen.getByText('Last step')).toBeInTheDocument();
+        expect(screen.getByText('Fill patterns')).toBeInTheDocument();
+        expect(screen.getByText(/seek the playhead/i)).toBeInTheDocument();
     });
 
     it('does not show keyboard cheatsheet when showKeyboardCheatsheet=false', () => {

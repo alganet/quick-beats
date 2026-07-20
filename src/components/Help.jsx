@@ -117,7 +117,23 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                 <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Enter</div>
                                 <div>Toggle focused step</div>
                             </div>
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Home</div>
+                                <div>First step</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">End</div>
+                                <div>Last step</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Menu</div>
+                                <div>Fill patterns</div>
+                            </div>
                         </div>
+                        <p className="text-fg-secondary text-xs mt-4 leading-relaxed">
+                            Tab to the beat ruler to seek the playhead with the arrow keys —
+                            <span className="text-fg"> Page Up / Down</span> jumps by a bar.
+                        </p>
                         {onToggleSingleKeyShortcuts && (
                             <div className="mt-5 pt-4 border-t border-border-dim flex items-center gap-3">
                                 <button

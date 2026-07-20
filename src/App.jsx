@@ -181,8 +181,10 @@ function App() {
     localStorage.setItem('qb-kit', activeKit);
   }, [activeKit]);
 
-  // Global keyboard shortcuts — the cheatsheet only helps where there's a keyboard.
-  const showKeyboardCheatsheet = useMediaQuery('(pointer: fine)');
+  // The cheatsheet only helps where there's a keyboard. any-pointer (not the
+  // primary pointer) so a hybrid laptop — coarse touch primary, but a fine
+  // trackpad and a keyboard — still sees it.
+  const showKeyboardCheatsheet = useMediaQuery('(any-pointer: fine)');
 
   // WCAG 2.1.4: single-character shortcuts must be disableable — speech-input
   // software turns ordinary dictation into a stream of them.
