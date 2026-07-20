@@ -73,9 +73,15 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
     return (
         <div
             ref={menuRef}
+            id="fill-menu"
             role="menu"
             aria-label="Fill pattern"
-            className="fixed z-[100] bg-surface-3 border border-border-default shadow-2xl rounded-lg overflow-hidden pointer-events-none"
+            // A keyboard-opened menu takes focus (Sequencer moves it here), so
+            // this composite is a valid aria-activedescendant host: as the option
+            // cycles, the referenced fill-<id> item is announced natively.
+            tabIndex={-1}
+            aria-activedescendant={activeOption ? `fill-${activeOption}` : undefined}
+            className="fixed z-[100] bg-surface-3 border border-border-default shadow-2xl rounded-lg overflow-hidden pointer-events-none focus:outline-none"
             style={{
                 left: x + offset,
                 top: y - FINGER_CLEARANCE_PX + yOffset,

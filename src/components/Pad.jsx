@@ -6,7 +6,7 @@ import { memo, useRef, useCallback } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
 import { Icon } from './Icons';
 
-export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded, isFocused, onFocusCell }) => {
+export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded, isFocused, onFocusCell, menuOpen = false }) => {
     const padRef = useRef(null);
 
     const onLongPress = useCallback(() => {
@@ -58,6 +58,12 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
                 onFocus={() => onFocusCell?.(rowIdx, colIdx)}
                 data-row={rowIdx}
                 data-col={colIdx}
+                // The pad is the menu's trigger: expose the disclosure while its
+                // fill menu is open. Virtual focus and the active option live on
+                // the menu itself (a valid activedescendant host), which takes
+                // focus for the duration; both attrs are absent when it's closed.
+                aria-haspopup={menuOpen ? 'menu' : undefined}
+                aria-expanded={menuOpen ? true : undefined}
                 // detail === 0 means a click no pointer produced: screen readers
                 // (VoiceOver, NVDA browse mode) activate a checkbox with a
                 // synthesized click that useLongPress's mousedown/mouseup pair

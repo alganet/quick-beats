@@ -260,11 +260,24 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
         }
     }, [menuState.isOpen, moveFocus, openFillMenu, pendingDelete, rowCount, stepsPerMeasure, stepCount, toggleStep]);
 
-    // Announce the active fill option for screen readers while a keyboard menu
-    // is open (focus stays on the pad, so the menu isn't read automatically).
-    const fillAnnouncement = (menuState.isOpen && menuState.source === 'keyboard' && menuState.activeOption)
-        ? `${menuState.activeOption} fill`
-        : '';
+    // A keyboard-opened fill menu takes focus (so its role="menu" +
+    // aria-activedescendant announce the active option natively); on close, focus
+    // returns to the pad it opened from. Only when focus fell to <body> — i.e. the
+    // menu unmounted with nothing else grabbing focus (Escape / Enter commit) — is
+    // it restored; a Tab close intentionally moved focus onward, so leave it.
+    const menuWasKbdOpenRef = useRef(false);
+    useEffect(() => {
+        const kbdOpen = menuState.isOpen && menuState.source === 'keyboard';
+        const wasOpen = menuWasKbdOpenRef.current;
+        menuWasKbdOpenRef.current = kbdOpen;
+        if (kbdOpen && !wasOpen) {
+            menuRef.current?.focus();
+        } else if (!kbdOpen && wasOpen && document.activeElement === document.body) {
+            scrollContainerRef.current
+                ?.querySelector(`[data-row="${menuState.row}"][data-col="${menuState.col}"]`)
+                ?.focus();
+        }
+    }, [menuState.isOpen, menuState.source, menuState.row, menuState.col, menuRef]);
 
     // Focus-into-view: after a keyboard move, focus the target pad. If it's
     // outside the rendered window, scroll it in first and bail — the scroll
@@ -291,7 +304,6 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden relative select-none bg-surface-1">
-            <div className="sr-only" role="status" aria-live="polite">{fillAnnouncement}</div>
             {menuState.isOpen && (
                 <ContextMenu
                     ref={menuRef}
@@ -382,6 +394,11 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                                         visibleRange={renderRange}
                                         focusedCol={focusRow === rowIdx ? focusCol : -1}
                                         onFocusCell={handleFocusCell}
+                                        // Only the row holding the open fill menu gets a live
+                                        // menu column, so its pad can advertise the open menu
+                                        // (aria-expanded); every other row stays -1 and memo
+                                        // skips it.
+                                        menuCol={menuState.isOpen && menuState.row === rowIdx ? menuState.col : -1}
                                     />
                                 ))}
                                 </div>

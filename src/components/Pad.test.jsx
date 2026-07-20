@@ -187,6 +187,24 @@ describe('Pad', () => {
         expect(pad).toHaveClass('[touch-action:pan-x_pinch-zoom]');
     });
 
+    it('exposes no fill-menu disclosure when the menu is closed', () => {
+        render(<Pad {...defaultProps} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).not.toHaveAttribute('aria-haspopup');
+        expect(pad).not.toHaveAttribute('aria-expanded');
+    });
+
+    it('exposes the trigger disclosure while its menu is open', () => {
+        // Virtual focus + the active option live on the menu itself; the pad is
+        // just the trigger, so it advertises only the open popup.
+        render(<Pad {...defaultProps} menuOpen />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveAttribute('aria-haspopup', 'menu');
+        expect(pad).toHaveAttribute('aria-expanded', 'true');
+        expect(pad).not.toHaveAttribute('aria-activedescendant');
+        expect(pad).not.toHaveAttribute('aria-owns');
+    });
+
     it('applies faded styles to the cell when faded prop is true', () => {
         render(<Pad {...defaultProps} faded={true} />);
         const cell = screen.getByTestId('pad').parentElement;

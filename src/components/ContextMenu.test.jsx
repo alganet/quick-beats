@@ -29,6 +29,21 @@ describe('ContextMenu', () => {
         expect(screen.getByText('Clear')).toBeInTheDocument();
     });
 
+    it('is a focusable menu whose activedescendant tracks the active option', () => {
+        const ref = { current: null };
+        render(<ContextMenu ref={ref} x={100} y={200} activeOption="repeat" grouping={4} colInGroup={0} />);
+
+        const menu = screen.getByRole('menu', { name: 'Fill pattern' });
+        expect(menu).toHaveAttribute('id', 'fill-menu');
+        // Focusable (Sequencer moves focus here) and points at the active item.
+        expect(menu).toHaveAttribute('tabindex', '-1');
+        expect(menu).toHaveAttribute('aria-activedescendant', 'fill-repeat');
+        // The referenced items exist and the active one is checked.
+        expect(document.getElementById('fill-repeat')).toHaveAttribute('aria-checked', 'true');
+        expect(document.getElementById('fill-alternate')).toHaveAttribute('aria-checked', 'false');
+        expect(document.getElementById('fill-clear')).toBeInTheDocument();
+    });
+
     it('should highlight the active option', () => {
         const ref = { current: null };
         render(
