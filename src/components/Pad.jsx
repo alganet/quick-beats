@@ -4,6 +4,7 @@
 
 import { memo, useRef, useCallback } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
+import { Icon } from './Icons';
 
 export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded, isFocused, onFocusCell }) => {
     const padRef = useRef(null);
@@ -69,6 +70,17 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
                 `}
                 data-testid="pad"
             >
+                {/* Non-colour cue: humanized and plain-active pads share a hue
+                    axis a greyscale display or colour-vision deficiency can't
+                    separate, so humanized pads carry a corner humanize glyph.
+                    Sized to the pad and pinned bottom-right; aria-hidden since
+                    the label already says ", humanized". */}
+                {isActive && humanized && (
+                    <Icon
+                        id="humanize"
+                        className="pointer-events-none absolute bottom-0 right-0 w-[45%] h-[45%] text-accent-mark"
+                    />
+                )}
             </div>
         </div>
     );

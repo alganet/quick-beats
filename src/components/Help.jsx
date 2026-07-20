@@ -210,6 +210,22 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                             the same. Available for 16th-note time signatures (4/4, 3/4, 5/4).
                         </p>
                     </div>
+                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border-dim">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-sm bg-primary" />
+                            <span className="text-fg-secondary text-xs">Active</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="relative w-8 h-8 rounded-sm bg-accent">
+                                <Icon id="humanize" className="pointer-events-none absolute bottom-0 right-0 w-[45%] h-[45%] text-accent-mark" />
+                            </div>
+                            <span className="text-fg-secondary text-xs">Humanized</span>
+                        </div>
+                        <p className="text-fg-secondary text-xs leading-relaxed flex-1">
+                            Humanized steps carry a small mark in the corner, so you can tell them
+                            apart without relying on colour.
+                        </p>
+                    </div>
                 </HelpSection>
 
                 {/* Long Press */}

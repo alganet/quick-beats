@@ -62,6 +62,23 @@ describe('Pad', () => {
         expect(pad).not.toHaveClass('bg-primary'); // distinct hue, not the base tone
     });
 
+    it('marks a humanized active pad with a non-colour corner glyph', () => {
+        const { container } = render(<Pad {...defaultProps} isActive={true} humanized={true} />);
+        const mark = container.querySelector('.text-accent-mark');
+        expect(mark).toBeInTheDocument();
+        expect(mark).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('shows no corner glyph on a plain active pad', () => {
+        const { container } = render(<Pad {...defaultProps} isActive={true} humanized={false} />);
+        expect(container.querySelector('.text-accent-mark')).toBeNull();
+    });
+
+    it('shows no corner glyph on an inactive humanized pad', () => {
+        const { container } = render(<Pad {...defaultProps} isActive={false} humanized={true} />);
+        expect(container.querySelector('.text-accent-mark')).toBeNull();
+    });
+
     it('keeps the base tone for an active pad the model did not shape', () => {
         render(<Pad {...defaultProps} isActive={true} humanized={false} />);
         const pad = screen.getByTestId('pad');
