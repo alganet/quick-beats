@@ -41,7 +41,7 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
                     </button>
                 </div>
 
-                <p className="text-fg-secondary text-[10px] font-mono uppercase tracking-widest mb-4">
+                <p className="text-fg-secondary text-[11px] font-mono uppercase tracking-widest mb-4">
                     Instantly share with one click:
                 </p>
 
@@ -62,20 +62,20 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
                             className={`flex flex-col items-center justify-center gap-2 p-3 border border-border-default ${platform.color} transition-all group`}
                         >
                             <Icon id={platform.id} className={`w-5 h-5 text-fg-secondary ${platform.hoverText}`} />
-                            <span className={`text-[9px] font-mono uppercase tracking-tighter text-fg-muted ${platform.hoverText}`}>{platform.label}</span>
+                            <span className={`text-[11px] font-mono uppercase tracking-wide text-fg-muted ${platform.hoverText}`}>{platform.label}</span>
                         </a>
                     ))}
                 </div>
 
                 <div className="pt-6 border-t border-border-dim">
-                    <p className="text-fg-muted text-[9px] font-mono uppercase tracking-tighter mb-3">Or copy the direct link:</p>
+                    <p className="text-fg-muted text-[11px] font-mono uppercase tracking-wide mb-3">Or copy the direct link:</p>
                     <div className="flex gap-1">
-                        <div className="flex-1 bg-surface-0 border border-border-default px-3 py-1.5 text-[10px] font-mono text-fg-secondary truncate flex items-center">
+                        <div className="flex-1 bg-surface-0 border border-border-default px-3 py-1.5 text-[11px] font-mono text-fg-secondary truncate flex items-center">
                             {shareUrl}
                         </div>
                         <button
                             onClick={handleCopy}
-                            className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${copied ? 'bg-green-800 text-fg-on-primary' : 'bg-surface-4 text-fg-secondary hover:text-fg hover:bg-border-default'
+                            className={`px-3 py-1.5 text-[11px] font-black uppercase tracking-widest transition-all ${copied ? 'bg-green-800 text-fg-on-primary' : 'bg-surface-4 text-fg-secondary hover:text-fg hover:bg-border-default'
                                 }`}
                         >
                             {copied ? 'Copied' : 'Copy'}
@@ -85,7 +85,7 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
 
                 <button
                     onClick={onClose}
-                    className="w-full mt-8 py-3 border border-border-default text-[10px] font-black uppercase tracking-widest text-fg-secondary hover:text-fg hover:border-fg transition-all"
+                    className="w-full mt-8 py-3 border border-border-default text-[11px] font-black uppercase tracking-widest text-fg-secondary hover:text-fg hover:border-fg transition-all"
                 >
                     Close
                 </button>

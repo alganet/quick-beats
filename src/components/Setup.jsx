@@ -15,7 +15,7 @@ export default function Setup({
         <div className="z-40 min-h-dvh w-full flex flex-col items-center justify-start md:justify-center bg-surface-0 safe-px-6 overflow-y-auto py-12 md:py-6 relative short-landscape:h-dvh short-landscape:overflow-y-hidden short-landscape:justify-center">
             <button
                 onClick={onShowHelp}
-                className="absolute top-4 right-6 text-fg-muted hover:text-fg transition-colors font-mono text-[10px] uppercase tracking-tighter"
+                className="absolute top-4 right-6 text-fg-muted hover:text-fg transition-colors font-mono text-[11px] uppercase tracking-wide"
             >
                 v{__APP_VERSION__}
             </button>
@@ -39,7 +39,7 @@ export default function Setup({
                         {/* Drum-sound picker — the preview plays the chosen kit */}
                         {onSelectKit && (
                             <div className="flex items-center justify-center gap-2 mt-5 short-landscape:justify-start short-landscape:mt-4">
-                                <span className="text-fg-muted text-[10px] font-mono uppercase tracking-[0.2em]">Drum Kit</span>
+                                <span className="text-fg-muted text-[11px] font-mono uppercase tracking-[0.2em]">Drum Kit</span>
                                 {/* The popover hangs off the button's right edge, which fits while
                                     this sits centred in portrait. In short-landscape the button moves
                                     to the left edge of the branding column, where that would open
@@ -103,7 +103,7 @@ export default function Setup({
                                     <span className={`text-3xl font-bold transition-colors short-landscape:text-2xl ${isSelected ? 'text-accent' : 'text-fg'}`}>
                                         {sig.name}
                                     </span>
-                                    <span className={`px-2 py-0.5 border text-[9px] uppercase tracking-widest font-mono ${isSelected ? 'border-accent text-accent' : 'border-border-default text-fg-muted'
+                                    <span className={`px-2 py-0.5 border text-[11px] uppercase tracking-widest font-mono ${isSelected ? 'border-accent text-accent' : 'border-border-default text-fg-muted'
                                         }`}>
                                         {sig.label}
                                     </span>

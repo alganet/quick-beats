@@ -51,7 +51,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-fg-muted hover:text-fg transition-colors border border-border-default px-4 py-2 uppercase font-mono text-[10px] tracking-widest"
+                        className="text-fg-muted hover:text-fg transition-colors border border-border-default px-4 py-2 uppercase font-mono text-[11px] tracking-widest"
                     >
                         Close [ESC]
                     </button>
@@ -107,7 +107,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                 <button
                                     onClick={onToggleSingleKeyShortcuts}
                                     aria-pressed={singleKeyShortcuts}
-                                    className={`px-3 py-1.5 border font-mono text-[10px] uppercase tracking-widest transition-colors ${singleKeyShortcuts
+                                    className={`px-3 py-1.5 border font-mono text-[11px] uppercase tracking-widest transition-colors ${singleKeyShortcuts
                                         ? 'border-border-default text-fg hover:text-fg-secondary'
                                         : 'border-border-default text-fg-muted hover:text-fg'
                                         }`}
@@ -152,14 +152,14 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                             >
                                 <Icon id={`zoom-${demoZoom}`} className="w-5 h-5" />
                             </button>
-                            <span className="text-[10px] font-mono text-fg-muted uppercase">
+                            <span className="text-[11px] font-mono text-fg-muted uppercase">
                                 {['Small', 'Medium', 'Large'][demoZoom]}
                             </span>
                         </div>
                         <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
                             Tap the zoom button to cycle through three sizes.
-                            Use <span className="text-fg font-mono text-[10px] bg-surface-5 px-1.5 py-0.5 mx-0.5">small</span> to
-                            see more measures, <span className="text-fg font-mono text-[10px] bg-surface-5 px-1.5 py-0.5 mx-0.5">large</span> for
+                            Use <span className="text-fg font-mono text-[11px] bg-surface-5 px-1.5 py-0.5 mx-0.5">small</span> to
+                            see more measures, <span className="text-fg font-mono text-[11px] bg-surface-5 px-1.5 py-0.5 mx-0.5">large</span> for
                             precise editing on mobile.
                         </p>
                     </div>
@@ -173,13 +173,13 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                 <div className="w-8 h-8 flex items-center justify-center bg-surface-inverted text-fg-on-inverted shadow-[0_0_12px_color-mix(in_srgb,var(--color-highlight)_30%,transparent)]">
                                     <Icon id="follow" className="w-4 h-4" />
                                 </div>
-                                <span className="text-[10px] font-mono text-success">ON</span>
+                                <span className="text-[11px] font-mono text-success">ON</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <div className="w-8 h-8 flex items-center justify-center bg-surface-5 text-fg-muted">
                                     <Icon id="unfollow" className="w-4 h-4" />
                                 </div>
-                                <span className="text-[10px] font-mono text-fg-muted">OFF</span>
+                                <span className="text-[11px] font-mono text-fg-muted">OFF</span>
                             </div>
                         </div>
                         <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
@@ -197,7 +197,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                             <div className="w-8 h-8 flex items-center justify-center bg-surface-inverted text-fg-on-inverted shadow-[0_0_12px_color-mix(in_srgb,var(--color-highlight)_30%,transparent)]">
                                 <Icon id="humanize" className="w-4 h-4" />
                             </div>
-                            <span className="text-[10px] font-mono text-success">ON</span>
+                            <span className="text-[11px] font-mono text-success">ON</span>
                         </div>
                         <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
                             Click to run a trained AI groove model (GrooVAE) entirely in your browser,
@@ -206,7 +206,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                             The button lights up when humanized; edit the grid and it shows a
                              <span className="text-fg"> !</span> while it re-humanizes after a short pause. Click the lit
                             button to remove it (non-destructive: you get the exact flat pattern back).
-                            <span className="text-fg font-mono text-[10px] bg-surface-5 px-1 py-0.5">h</span> does
+                            <span className="text-fg font-mono text-[11px] bg-surface-5 px-1 py-0.5">h</span> does
                             the same. Available for 16th-note time signatures (4/4, 3/4, 5/4).
                         </p>
                     </div>
@@ -240,7 +240,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                     <MiniPad />
                                     <MiniPad />
                                 </div>
-                                <div className="text-[9px] font-mono text-fg-dim text-left mt-1 ml-1.5 animate-pulse">↑ long press</div>
+                                <div className="text-[11px] font-mono text-fg-dim text-left mt-1 ml-1.5 animate-pulse">↑ long press</div>
                             </div>
                             <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
                                 Long-press any pad to open a context menu. Drag to select an action:
@@ -253,8 +253,8 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                     <div className="w-1" />
                                     <MiniPad active /><MiniPad /><MiniPad /><MiniPad />
                                 </div>
-                                <span className="text-[10px] font-mono text-fg uppercase">Repeat</span>
-                                <span className="text-[9px] text-fg-muted">Fill every matching beat</span>
+                                <span className="text-[11px] font-mono text-fg uppercase">Repeat</span>
+                                <span className="text-[11px] text-fg-muted">Fill every matching beat</span>
                             </div>
                             <div className="bg-surface-0 border border-border-dim p-3 flex flex-col items-center gap-2">
                                 <div className="flex items-center gap-0.5">
@@ -262,8 +262,8 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                     <div className="w-1" />
                                     <MiniPad clearing /><MiniPad /><MiniPad /><MiniPad />
                                 </div>
-                                <span className="text-[10px] font-mono text-fg uppercase">Alternate</span>
-                                <span className="text-[9px] text-fg-muted">Every other group</span>
+                                <span className="text-[11px] font-mono text-fg uppercase">Alternate</span>
+                                <span className="text-[11px] text-fg-muted">Every other group</span>
                             </div>
                             <div className="bg-surface-0 border border-border-dim p-3 flex flex-col items-center gap-2">
                                 <div className="flex items-center gap-0.5">
@@ -271,8 +271,8 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                     <div className="w-1" />
                                     <MiniPad clearing /><MiniPad /><MiniPad /><MiniPad />
                                 </div>
-                                <span className="text-[10px] font-mono text-fg uppercase">Clear</span>
-                                <span className="text-[9px] text-fg-muted">Remove from all beats</span>
+                                <span className="text-[11px] font-mono text-fg uppercase">Clear</span>
+                                <span className="text-[11px] text-fg-muted">Remove from all beats</span>
                             </div>
                         </div>
                     </div>
@@ -318,9 +318,9 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                 </p>
                                 <p>
                                     A confirmation prompt will appear with
-                                    {' '}<span className="text-[10px] font-mono font-bold text-danger bg-danger/10 border border-danger/30 px-1.5 py-0.5">Yes</span>{' '}
+                                    {' '}<span className="text-[11px] font-mono font-bold text-danger bg-danger/10 border border-danger/30 px-1.5 py-0.5">Yes</span>{' '}
                                     and
-                                    {' '}<span className="text-[10px] font-mono text-fg-secondary bg-highlight/5 border border-highlight/10 px-1.5 py-0.5">No</span>{' '}
+                                    {' '}<span className="text-[11px] font-mono text-fg-secondary bg-highlight/5 border border-highlight/10 px-1.5 py-0.5">No</span>{' '}
                                     buttons, and the measure will fade to show what will be removed. The prompt auto-dismisses after 3 seconds.
                                 </p>
                             </div>
@@ -336,7 +336,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                     <p className="text-fg-secondary text-xs md:text-sm leading-relaxed mb-3 text-center">
                         It was created by <a href="https://alganet.github.io" target="_blank" className="text-fg underline cursor-pointer">Alexandre Gomes Gaigalas</a> with the help of these amazing libraries:
                     </p>
-                    <div className="flex flex-wrap gap-2 text-[10px] font-mono text-fg-secondary uppercase justify-center mb-3">
+                    <div className="flex flex-wrap gap-2 text-[11px] font-mono text-fg-secondary uppercase justify-center mb-3">
                         <span className="bg-surface-0 px-2 py-1 border border-border-dim">Tone.js</span>
                         <span className="bg-surface-0 px-2 py-1 border border-border-dim">React 19</span>
                         <span className="bg-surface-0 px-2 py-1 border border-border-dim">Tailwind CSS</span>

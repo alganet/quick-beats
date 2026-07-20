@@ -16,13 +16,13 @@ export default function PortraitNudge({ canRotate, onRotate, onDismiss }) {
     return (
         <div className="flex-none flex items-center gap-3 px-3 py-2 bg-surface-2 border-t border-border-default">
             <Icon id="rotate" className="w-4 h-4 text-accent flex-none" />
-            <p className="flex-1 min-w-0 text-fg-muted text-[10px] font-mono uppercase tracking-tighter">
+            <p className="flex-1 min-w-0 text-fg-muted text-[11px] font-mono uppercase tracking-wide">
                 {canRotate ? 'More room in landscape' : 'Turn your device sideways for more room'}
             </p>
             {canRotate && (
                 <button
                     onClick={onRotate}
-                    className="h-6 px-2 flex-none flex items-center border border-border-default text-[10px] font-bold font-mono text-fg-muted hover:text-fg uppercase tracking-tighter transition-colors"
+                    className="h-6 px-2 flex-none flex items-center border border-border-default text-[11px] font-bold font-mono text-fg-muted hover:text-fg uppercase tracking-wide transition-colors"
                 >
                     Rotate
                 </button>

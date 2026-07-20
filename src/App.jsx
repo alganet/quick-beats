@@ -42,7 +42,7 @@ const ACTION_DELAY_MS = 200;
 // target size, which per-button padding alone did not reach.
 const HEADER_ACTION_CLASS =
   'h-6 px-2 flex-none flex items-center gap-2 border border-border-default ' +
-  'text-[10px] font-bold font-mono uppercase tracking-tighter ' +
+  'text-[11px] font-bold font-mono uppercase tracking-wide ' +
   'text-fg-muted hover:text-fg transition-colors';
 
 function App() {

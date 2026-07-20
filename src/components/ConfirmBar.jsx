@@ -24,19 +24,19 @@ export default function ConfirmBar({ measureIndex, onConfirm, onCancel }) {
 
     return (
         <div className="flex items-center justify-center gap-3 animate-in fade-in h-full">
-            <span className="text-[10px] font-mono text-danger uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[11px] font-mono text-danger uppercase tracking-wider whitespace-nowrap">
                 Delete section {measureIndex + 1}?
             </span>
             <button
                 onClick={(e) => { e.stopPropagation(); onConfirm(); }}
-                className="text-[10px] font-mono font-bold text-danger hover:text-danger-dim bg-danger/10 hover:bg-danger/20 border border-danger/30 px-2.5 py-0.5 transition-all uppercase tracking-wider"
+                className="text-[11px] font-mono font-bold text-danger hover:text-danger-dim bg-danger/10 hover:bg-danger/20 border border-danger/30 px-2.5 py-0.5 transition-all uppercase tracking-wider"
             >
                 Yes
             </button>
             <button
                 ref={cancelRef}
                 onClick={(e) => { e.stopPropagation(); onCancel(); }}
-                className="text-[10px] font-mono text-fg-muted hover:text-fg-secondary bg-highlight/5 hover:bg-highlight/10 border border-highlight/10 px-2.5 py-0.5 transition-all uppercase tracking-wider"
+                className="text-[11px] font-mono text-fg-muted hover:text-fg-secondary bg-highlight/5 hover:bg-highlight/10 border border-highlight/10 px-2.5 py-0.5 transition-all uppercase tracking-wider"
             >
                 No
             </button>
