@@ -35,7 +35,9 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
     return (
         <div
             role="gridcell"
-            aria-colindex={colIdx + 1}
+            /* +2, not +1: colindex 1 is the row's sticky rowheader, so the
+               first pad is the grid's second column. */
+            aria-colindex={colIdx + 2}
             className={`flex-none ${faded ? 'opacity-30 pointer-events-none' : ''}`}
             style={{
                 width: `${config.cellWidth}px`,
@@ -62,8 +64,12 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
                 // never sees. Real pointer clicks arrive with detail ≥ 1 and are
                 // handled by the long-press path, so this cannot double-fire.
                 onClick={(e) => { if (e.detail === 0) toggleStep(rowIdx, colIdx); }}
+                // A mouse right-click is the desktop idiom for the fill menu that
+                // long-press opens on touch; without this it fell through to the
+                // browser's native context menu.
+                onContextMenu={(e) => { e.preventDefault(); onLongPress(); }}
                 {...longPressHandlers}
-                className={`pad w-full h-full cursor-pointer touch-pan-x relative ${config.radiusClass}
+                className={`pad w-full h-full cursor-pointer [touch-action:pan-x_pinch-zoom] relative ${config.radiusClass}
                     ${isActive
                         ? (humanized ? "bg-accent" : "bg-primary")
                         : "bg-surface-5 hover:bg-border-medium border border-border-bright"}

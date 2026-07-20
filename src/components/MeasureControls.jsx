@@ -109,7 +109,7 @@ export function MeasureControls({
                     return isPending ? (
                         <div
                             key={measureIdx}
-                            className="group flex-none flex transition-left border border-surface-5 relative bg-danger/10 z-50 overflow-visible"
+                            className="group flex-none flex border border-surface-5 relative bg-danger/10 z-50 overflow-visible"
                             style={sizeStyle}
                             data-measure-control-index={measureIdx}
                         >
@@ -128,7 +128,7 @@ export function MeasureControls({
                             key={measureIdx}
                             type="button"
                             aria-label={`Delete measure ${measureIdx + 1}`}
-                            className="group flex-none flex cursor-pointer transition-left border border-surface-5 relative bg-surface-6 hover:bg-surface-4 text-danger-dim hover:text-danger"
+                            className="group flex-none flex cursor-pointer border border-surface-5 relative bg-surface-6 hover:bg-surface-4 text-danger-dim hover:text-danger"
                             style={sizeStyle}
                             onClick={(event) => {
                                 if (pendingDelete === null) {
@@ -139,7 +139,7 @@ export function MeasureControls({
                             data-measure-control-index={measureIdx}
                         >
                             <StickyIconWrapper>
-                                <span aria-hidden="true" className="align-baseline text-md font-bold transition-transform group-hover:-translate-y-0.5">x</span>
+                                <span aria-hidden="true" className="align-baseline text-base font-bold transition-transform group-hover:-translate-y-0.5">x</span>
                             </StickyIconWrapper>
                         </button>
                     );

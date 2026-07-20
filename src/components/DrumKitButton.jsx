@@ -61,7 +61,7 @@ export default function DrumKitButton({
             {open && (
                 <div
                     role="menu"
-                    className={`absolute top-full ${menuClassName} mt-2 w-48 z-[100] bg-surface-3 border border-border-default rounded-sm p-1 text-xs text-fg-secondary shadow-lg animate-in fade-in duration-150`}
+                    className={`absolute top-full ${menuClassName} mt-2 w-48 z-[100] bg-surface-3 border border-border-default rounded-sm p-1 text-xs text-fg-secondary shadow-lg`}
                 >
                     <div className={`absolute -top-1 ${arrowClassName} w-2 h-2 bg-surface-3 border-l border-t border-border-default rotate-45`} />
                     <div className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-fg-muted">Drum sounds</div>

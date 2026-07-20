@@ -136,6 +136,10 @@
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Kill the grey flash browsers paint over a tapped element — it reads as
+     "web page", not "app", and is most visible on the sequencer pads.
+     Inherited, so setting it here covers every descendant. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 @layer base {
@@ -170,6 +174,10 @@ input[type="range"].tempo-input {
   background: transparent;
   cursor: pointer;
   width: 100%;
+  /* A 24px hit area (WCAG 2.5.8) over a 4px painted track: the box is
+     transparent, so only the track and thumb show, but a finger has the full
+     height to land on. Without this the input collapses to the 4px track. */
+  height: 24px;
 }
 
 /* Track: webkit */

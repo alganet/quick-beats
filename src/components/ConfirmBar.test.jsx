@@ -41,27 +41,34 @@ describe('ConfirmBar', () => {
         expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('automatically calls onCancel after 3 seconds', () => {
+    it('does not auto-dismiss on a timer (WCAG 2.2.1)', () => {
         const onCancel = vi.fn();
         render(<ConfirmBar measureIndex={0} onConfirm={() => {}} onCancel={onCancel} />);
 
         act(() => {
-            vi.advanceTimersByTime(3000);
+            vi.advanceTimersByTime(10000);
         });
 
+        // The confirmation stays put; only Yes/No resolves it.
+        expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('cancels on Escape, from anywhere', () => {
+        // With the timer gone, Escape is the passive way out of an accidental
+        // tap — the pending measure is faded and locked until resolved.
+        const onCancel = vi.fn();
+        render(<ConfirmBar measureIndex={0} onConfirm={() => {}} onCancel={onCancel} />);
+
+        fireEvent.keyDown(window, { key: 'Escape' });
         expect(onCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('clears timeout on unmount', () => {
+    it('stops listening for Escape once unmounted', () => {
         const onCancel = vi.fn();
         const { unmount } = render(<ConfirmBar measureIndex={0} onConfirm={() => {}} onCancel={onCancel} />);
-        
         unmount();
-        
-        act(() => {
-            vi.advanceTimersByTime(3000);
-        });
 
+        fireEvent.keyDown(window, { key: 'Escape' });
         expect(onCancel).not.toHaveBeenCalled();
     });
 });

@@ -7,13 +7,21 @@ import { useEffect, useRef } from "react";
 export default function ConfirmBar({ measureIndex, onConfirm, onCancel }) {
     const cancelRef = useRef(null);
 
-    // Auto-dismiss after 3 seconds
+    // No auto-dismiss: a destructive-delete confirmation must not vanish on a
+    // timer (WCAG 2.2.1). It stays until the user resolves it — but it must
+    // stay escapable: while pending, the measure is faded and locked, so with
+    // the timer gone Escape is the way out that doesn't require finding the No
+    // button. Window-level so it works wherever focus wandered; a dialog's own
+    // Escape never reaches here (useDialog stops propagation).
+    const onCancelRef = useRef(onCancel);
+    useEffect(() => { onCancelRef.current = onCancel; });
     useEffect(() => {
-        const timer = setTimeout(() => {
-            onCancel();
-        }, 3000);
-        return () => clearTimeout(timer);
-    }, [onCancel]);
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') onCancelRef.current?.();
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, []);
 
     // The delete button that opened this unmounts, which would drop keyboard
     // focus to <body>. Landing on No (not Yes) keeps a double-press from
@@ -23,7 +31,7 @@ export default function ConfirmBar({ measureIndex, onConfirm, onCancel }) {
     }, []);
 
     return (
-        <div className="flex items-center justify-center gap-3 animate-in fade-in h-full">
+        <div className="flex items-center justify-center gap-3 h-full">
             <span className="text-[11px] font-mono text-danger uppercase tracking-wider whitespace-nowrap">
                 Delete section {measureIndex + 1}?
             </span>

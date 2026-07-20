@@ -80,7 +80,7 @@ export default function HumanizeButton({ status, progress = 0, onClick }) {
                     <div
                         id="humanize-popover"
                         role="tooltip"
-                        className="absolute top-full right-0 mt-2 w-56 z-[100] bg-surface-3 border border-border-default rounded-sm p-3 text-xs text-fg-secondary shadow-lg animate-in fade-in duration-150"
+                        className="absolute top-full right-0 mt-2 w-56 z-[100] bg-surface-3 border border-border-default rounded-sm p-3 text-xs text-fg-secondary shadow-lg"
                     >
                         <div className="absolute -top-1 right-3 w-2 h-2 bg-surface-3 border-l border-t border-border-default rotate-45" />
                         <p>{popoverText}</p>

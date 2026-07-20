@@ -319,7 +319,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
             )}
             <div
                 ref={scrollContainerRef}
-                className="relative flex-1 overflow-x-auto overflow-y-auto"
+                className="relative flex-1 overflow-x-auto overflow-y-auto overscroll-contain"
                 data-sequencer-scroll-container="true"
                 onWheel={handleWheel}
                 onTouchStart={handleTouchStart}
@@ -351,7 +351,10 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                                     role="grid"
                                     aria-label="Step sequencer"
                                     aria-rowcount={INSTRUMENTS.length}
-                                    aria-colcount={stepCount}
+                                    // +1 for the sticky rowheader column each row
+                                    // carries before its pads (colindex 1); pads
+                                    // therefore start at colindex 2.
+                                    aria-colcount={stepCount + 1}
                                     className="flex flex-col"
                                     onKeyDown={handleGridKeyDown}
                                     onFocus={() => setGridHasFocus(true)}

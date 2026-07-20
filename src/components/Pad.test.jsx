@@ -167,10 +167,24 @@ describe('Pad', () => {
         }));
     });
 
-    it('prevents vertical page scroll on touch (touch-action pan-x)', () => {
+    it('opens the fill menu on right-click (desktop equivalent of long-press)', () => {
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+            left: 10, top: 20, width: 40, height: 40, right: 50, bottom: 60, x: 10, y: 20, toJSON: () => {}
+        });
         render(<Pad {...defaultProps} />);
         const pad = screen.getByTestId('pad');
-        expect(pad).toHaveClass('touch-pan-x');
+
+        fireEvent.contextMenu(pad);
+
+        expect(defaultProps.setMenuState).toHaveBeenCalledWith(expect.objectContaining({
+            isOpen: true, source: 'pointer', row: 0, col: 0,
+        }));
+    });
+
+    it('suppresses double-tap-zoom while allowing pan and pinch-zoom on touch', () => {
+        render(<Pad {...defaultProps} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveClass('[touch-action:pan-x_pinch-zoom]');
     });
 
     it('applies faded styles to the cell when faded prop is true', () => {
@@ -216,10 +230,11 @@ describe('Pad', () => {
         expect(pad).toHaveAttribute('data-col', '4');
     });
 
-    it('wraps the pad in a gridcell carrying the 1-based column index', () => {
+    it('wraps the pad in a gridcell whose colindex offsets past the rowheader', () => {
         render(<Pad {...defaultProps} colIdx={4} />);
         const cell = screen.getByTestId('pad').parentElement;
         expect(cell).toHaveAttribute('role', 'gridcell');
-        expect(cell).toHaveAttribute('aria-colindex', '5');
+        // colindex 1 is the row's sticky rowheader, so pad colIdx 4 is column 6.
+        expect(cell).toHaveAttribute('aria-colindex', '6');
     });
 });

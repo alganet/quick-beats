@@ -13,14 +13,14 @@ export default function ErrorModal({ isOpen, onGoHome }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-overlay/90 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-overlay/90 backdrop-blur-sm">
             <div
                 ref={dialogRef}
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby="error-modal-title"
                 aria-describedby="error-modal-desc"
-                className="w-full max-w-md bg-surface-2 border border-danger/50 p-8 shadow-2xl animate-in zoom-in-95 duration-200"
+                className="w-full max-w-md bg-surface-2 border border-danger/50 p-8 shadow-2xl"
             >
                 <div className="flex flex-col items-center text-center mb-8">
                     <div className="w-16 h-16 mb-6 rounded-full bg-danger/20 flex items-center justify-center">

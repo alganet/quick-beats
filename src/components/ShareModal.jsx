@@ -8,14 +8,24 @@ import { Icon } from './Icons';
 
 export default function ShareModal({ isOpen, onClose, shareUrl }) {
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState(false);
     const dialogRef = useDialog(isOpen, onClose);
 
     if (!isOpen) return null;
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(shareUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async () => {
+        // writeText rejects in non-secure contexts and when permission is
+        // denied; without this the click looked like it did nothing.
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopyError(false);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setCopied(false);
+            setCopyError(true);
+            setTimeout(() => setCopyError(false), 4000);
+        }
     };
 
     return (
@@ -24,7 +34,7 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
         // clicks inside the panel from closing without a stopPropagation guard.
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-sm"
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div
@@ -32,7 +42,7 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="share-modal-title"
-                className="w-full max-w-md bg-surface-2 border border-border-default p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+                className="w-full max-w-md bg-surface-2 border border-border-default p-6 shadow-2xl"
             >
                 <div className="flex items-center justify-between mb-6">
                     <h2 id="share-modal-title" className="text-xl font-black tracking-tighter text-fg uppercase">Share Beat</h2>
@@ -80,6 +90,16 @@ export default function ShareModal({ isOpen, onClose, shareUrl }) {
                         >
                             {copied ? 'Copied' : 'Copy'}
                         </button>
+                    </div>
+                    {copyError && (
+                        <p className="text-danger text-[11px] font-mono mt-2">
+                            Couldn't copy automatically — select the link above and copy it.
+                        </p>
+                    )}
+                    {/* Announce the transient copy outcome; the visual "Copied"
+                        label is aria-hidden noise to a screen reader on its own. */}
+                    <div className="sr-only" role="status" aria-live="polite">
+                        {copied ? 'Link copied to clipboard' : copyError ? 'Could not copy the link' : ''}
                     </div>
                 </div>
 

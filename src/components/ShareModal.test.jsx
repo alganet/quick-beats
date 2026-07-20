@@ -77,7 +77,17 @@ describe('ShareModal', () => {
         const copyButton = screen.getByRole('button', { name: /copy/i });
         fireEvent.click(copyButton);
 
-        expect(screen.getByText('Copied')).toBeInTheDocument();
+        expect(await screen.findByText('Copied')).toBeInTheDocument();
+    });
+
+    it('shows a fallback hint when the clipboard write rejects', async () => {
+        navigator.clipboard.writeText = vi.fn().mockRejectedValue(new Error('denied'));
+        render(<ShareModal {...defaultProps} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /copy/i }));
+
+        expect(await screen.findByText(/select the link above/i)).toBeInTheDocument();
+        expect(screen.queryByText('Copied')).not.toBeInTheDocument();
     });
 
     it('should display sharing options', () => {
