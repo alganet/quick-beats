@@ -38,6 +38,12 @@ describe('MeasureControls', () => {
         expect(buttons).toHaveLength(3);
     });
 
+    it('exposes each idle delete strip as a named button', () => {
+        render(<MeasureControls {...defaultProps} />);
+        expect(screen.getByRole('button', { name: 'Delete measure 1' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete measure 2' })).toBeInTheDocument();
+    });
+
     it('sets pending delete on click', () => {
         const setPendingDelete = vi.fn();
         render(<MeasureControls {...defaultProps} setPendingDelete={setPendingDelete} />);
@@ -118,5 +124,41 @@ describe('MeasureControls', () => {
         fireEvent.click(screen.getByText('No'));
         expect(removeMeasure).not.toHaveBeenCalled();
         expect(setPendingDelete).toHaveBeenCalledWith(null);
+    });
+
+    it('returns focus to the delete strip after cancelling', () => {
+        // The ConfirmBar's focused button unmounts on resolve, dropping keyboard
+        // focus to <body>; the remounted delete strip must pick it back up.
+        const { rerender } = render(<MeasureControls {...defaultProps} pendingDelete={1} />);
+        screen.getByText('No').focus();
+        fireEvent.click(screen.getByText('No'));
+        rerender(<MeasureControls {...defaultProps} pendingDelete={null} />);
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete measure 2' }));
+    });
+
+    it('clamps the focus target when the last measure was deleted', () => {
+        const { rerender } = render(<MeasureControls {...defaultProps} measureCount={3} pendingDelete={2} />);
+        screen.getByText('Yes').focus();
+        fireEvent.click(screen.getByText('Yes'));
+        rerender(<MeasureControls {...defaultProps} measureCount={2} pendingDelete={null} />);
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete measure 2' }));
+    });
+
+    it('leaves focus alone when the confirmation was resolved by pointer elsewhere', () => {
+        const { rerender } = render(
+            <>
+                <button data-testid="outside">outside</button>
+                <MeasureControls {...defaultProps} pendingDelete={1} />
+            </>
+        );
+        fireEvent.click(screen.getByText('No'));
+        screen.getByTestId('outside').focus();
+        rerender(
+            <>
+                <button data-testid="outside">outside</button>
+                <MeasureControls {...defaultProps} pendingDelete={null} />
+            </>
+        );
+        expect(document.activeElement).toBe(screen.getByTestId('outside'));
     });
 });

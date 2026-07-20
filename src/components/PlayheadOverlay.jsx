@@ -26,7 +26,7 @@ export function PlayheadOverlay({
                 className="relative p-0.5 md:p-1"
             >
                 <div
-                    className="absolute top-0 bottom-0 w-[2px] left-0 bg-accent z-10"
+                    className="playhead absolute top-0 bottom-0 w-[2px] left-0 bg-accent z-10"
                     style={{ transform: `translateX(${stepOffset}px)` }}
                     data-testid="playhead-indicator"
                     aria-hidden="true"

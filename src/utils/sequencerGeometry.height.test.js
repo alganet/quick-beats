@@ -85,4 +85,11 @@ describe('fitZoom', () => {
     it('allows a larger ceiling when asked', () => {
         expect(fitZoom({ availableHeightPx: 2000, rowCount: ROWS, measureCount: 2, mobile: false, maxZoom: 2 })).toBe(2);
     });
+
+    it('never fits below minZoom, even when nothing fits (coarse pointers)', () => {
+        // Zoom 0's 20px pads are under the 24px WCAG 2.5.8 floor; a touch
+        // device passes minZoom 1 and gets a scrolling grid instead.
+        expect(fitZoom({ availableHeightPx: 304, rowCount: ROWS, measureCount: 2, mobile: false, minZoom: 1 })).toBe(1);
+        expect(fitZoom({ availableHeightPx: 50, rowCount: ROWS, measureCount: 2, mobile: false, minZoom: 1 })).toBe(1);
+    });
 });

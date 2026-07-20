@@ -62,6 +62,48 @@ describe('SequencerHeader', () => {
         expect(defaultProps.onSeek).toHaveBeenCalled();
     });
 
+    it('exposes the ruler as a slider valued at the 1-based current step', () => {
+        render(<SequencerHeader {...defaultProps} />);
+        const slider = screen.getByRole('slider', { name: /playhead/i });
+        expect(slider).toHaveAttribute('aria-valuemin', '1');
+        expect(slider).toHaveAttribute('aria-valuemax', '16');
+        expect(slider).toHaveAttribute('aria-valuenow', '5');
+        expect(slider).toHaveAttribute('tabindex', '0');
+    });
+
+    it('seeks with arrows, Home/End and PageUp/PageDown, clamped to the grid', () => {
+        const onSeekStep = vi.fn();
+        render(<SequencerHeader {...defaultProps} onSeekStep={onSeekStep} />);
+        const slider = screen.getByRole('slider', { name: /playhead/i });
+
+        fireEvent.keyDown(slider, { key: 'ArrowRight' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(5);
+        fireEvent.keyDown(slider, { key: 'ArrowLeft' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(3);
+        fireEvent.keyDown(slider, { key: 'PageDown' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(8); // +stepsPerMeasure
+        fireEvent.keyDown(slider, { key: 'PageUp' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(0);
+        fireEvent.keyDown(slider, { key: 'End' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(15);
+        fireEvent.keyDown(slider, { key: 'Home' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(0);
+    });
+
+    it('clamps keyboard seeks at the grid edges', () => {
+        const onSeekStep = vi.fn();
+        render(<SequencerHeader {...defaultProps} currentStep={0} onSeekStep={onSeekStep} />);
+        fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowLeft' });
+        expect(onSeekStep).toHaveBeenLastCalledWith(0);
+    });
+
+    it('leaves unrelated keys alone', () => {
+        const onSeekStep = vi.fn();
+        render(<SequencerHeader {...defaultProps} onSeekStep={onSeekStep} />);
+        fireEvent.keyDown(screen.getByRole('slider'), { key: 'a' });
+        expect(onSeekStep).not.toHaveBeenCalled();
+    });
+
     it('fades measure when pending delete', () => {
         const { container } = render(<SequencerHeader {...defaultProps} pendingDelete={0} />);
         const { steps } = getHeaderAndSteps(container);

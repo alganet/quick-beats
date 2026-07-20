@@ -746,10 +746,65 @@ describe('App', () => {
         expect(mockUseAudio.playNote).toHaveBeenCalled();
     });
 
-    it('saves preferences to localStorage', () => {
-         mockUseAudio.isLoaded = true;
-         render(<App />);
-         expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-auto-scroll', 'true');
+    it('saves an auto-scroll choice, but never the untouched default', () => {
+        // Writing the seeded default back on mount would freeze it as a "saved
+        // choice" and stop the OS motion preference from ever mattering again.
+        vi.useFakeTimers();
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        expect(localStorageMock.setItem).not.toHaveBeenCalledWith('qb-auto-scroll', expect.any(String));
+
+        fireEvent.keyDown(window, { key: 's' });
+        act(() => {
+            vi.advanceTimersByTime(210);
+        });
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-auto-scroll', 'false');
+        vi.useRealTimers();
+    });
+
+    it('defaults auto-scroll off under prefers-reduced-motion', () => {
+        // The playhead auto-scroll is a recurring half-viewport jump and its
+        // toggle only renders during playback — the default has to respect the
+        // OS preference because the user can't get ahead of it.
+        const origMatchMedia = window.matchMedia;
+        window.matchMedia = vi.fn((query) => ({
+            matches: query === '(prefers-reduced-motion: reduce)',
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        }));
+
+        vi.useFakeTimers();
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        // The default is not persisted (see above); toggling from it records
+        // 'true', proving the reduced-motion default really started off.
+        expect(localStorageMock.setItem).not.toHaveBeenCalledWith('qb-auto-scroll', expect.any(String));
+
+        fireEvent.keyDown(window, { key: 's' });
+        act(() => {
+            vi.advanceTimersByTime(210);
+        });
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-auto-scroll', 'true');
+        vi.useRealTimers();
+
+        window.matchMedia = origMatchMedia;
+    });
+
+    it('lets a saved auto-scroll choice win over prefers-reduced-motion', () => {
+        localStorageMock.setItem('qb-auto-scroll', 'true');
+        localStorageMock.setItem.mockClear();
+        const origMatchMedia = window.matchMedia;
+        window.matchMedia = vi.fn(() => ({
+            matches: true,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        }));
+
+        mockUseAudio.isLoaded = true;
+        render(<App />);
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('qb-auto-scroll', 'true');
+
+        window.matchMedia = origMatchMedia;
     });
 
     it('does not record a zoom preference the user never expressed', () => {

@@ -42,10 +42,17 @@ describe('Pad', () => {
         expect(pad).not.toHaveClass('bg-primary');
     });
 
+    it('outlines the inactive pad so its boundary survives the lane background', () => {
+        render(<Pad {...defaultProps} />);
+        const pad = screen.getByTestId('pad');
+        expect(pad).toHaveClass('border-border-bright');
+    });
+
     it('renders active state correctly', () => {
         render(<Pad {...defaultProps} isActive={true} />);
         const pad = screen.getByTestId('pad');
         expect(pad).toHaveClass('bg-primary');
+        expect(pad).not.toHaveClass('border-border-bright');
     });
 
     it('renders the accent hue for a humanized active pad', () => {
@@ -81,6 +88,27 @@ describe('Pad', () => {
         fireEvent.mouseUp(pad);
 
         expect(defaultProps.toggleStep).toHaveBeenCalledWith(0, 0);
+    });
+
+    it('toggles on a synthesized click (screen-reader activation, detail 0)', () => {
+        defaultProps.toggleStep.mockClear();
+        render(<Pad {...defaultProps} />);
+        const pad = screen.getByTestId('pad');
+
+        // VoiceOver/NVDA browse mode activate a checkbox with a click that has
+        // no preceding mousedown/mouseup and detail 0.
+        fireEvent.click(pad, { detail: 0 });
+        expect(defaultProps.toggleStep).toHaveBeenCalledTimes(1);
+        expect(defaultProps.toggleStep).toHaveBeenCalledWith(0, 0);
+    });
+
+    it('ignores pointer-originated clicks (detail ≥ 1) so the press path cannot double-fire', () => {
+        defaultProps.toggleStep.mockClear();
+        render(<Pad {...defaultProps} />);
+        const pad = screen.getByTestId('pad');
+
+        fireEvent.click(pad, { detail: 1 });
+        expect(defaultProps.toggleStep).not.toHaveBeenCalled();
     });
 
     it('opens menu on long press', () => {

@@ -17,7 +17,8 @@ describe('Help', () => {
     it('shows keyboard cheatsheet when showKeyboardCheatsheet=true', () => {
         render(<Help isOpen={true} onClose={() => {}} showKeyboardCheatsheet={true} />);
         expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument();
-        expect(screen.getByText('Play / Pause')).toBeInTheDocument();
+        // Two rows now document Play / Pause: the p key and Space.
+        expect(screen.getAllByText('Play / Pause')).toHaveLength(2);
         expect(screen.getByText('Toggle zoom')).toBeInTheDocument();
     });
 

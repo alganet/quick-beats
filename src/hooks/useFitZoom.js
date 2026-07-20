@@ -33,6 +33,10 @@ export function useFitZoom({ scrollContainerRef, enabled, rowCount, measureCount
                 availableHeightPx: container.clientHeight,
                 rowCount,
                 measureCount,
+                // Auto-fit never picks zoom 0 for a finger: its 20px pads are
+                // below the 24px minimum target size (WCAG 2.5.8). The zoom
+                // button can still reach it as a deliberate choice.
+                minZoom: window.matchMedia?.('(pointer: coarse)').matches ? 1 : 0,
             }));
         };
 

@@ -45,6 +45,18 @@ describe('useKeyboardShortcuts', () => {
         expect(event.defaultPrevented).toBe(true);
     });
 
+    it('p toggles play (single-key alternative to Space)', () => {
+        mount();
+        press('p');
+        expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
+    });
+
+    it('p is disabled with the rest of the single-key shortcuts', () => {
+        renderHook(() => useKeyboardShortcuts({ ...handlers, singleKeyEnabled: false }));
+        press('p');
+        expect(handlers.togglePlay).not.toHaveBeenCalled();
+    });
+
     it('? opens help', () => {
         mount();
         press('?');
@@ -116,6 +128,66 @@ describe('useKeyboardShortcuts', () => {
         expect(handlers.togglePlay).not.toHaveBeenCalled();
         expect(handlers.humanizeAction).not.toHaveBeenCalled();
         expect(handlers.setIsHelpOpen).not.toHaveBeenCalled();
+    });
+
+    it('+ also increments BPM (tooltip documents it)', () => {
+        mount();
+        press('+');
+        const updater = handlers.setBpmInput.mock.calls[0][0];
+        expect(updater(100)).toBe(101);
+    });
+
+    it('ignores modifier combos so browser shortcuts survive', () => {
+        mount();
+        for (const mod of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }]) {
+            const event = new KeyboardEvent('keydown', { key: 's', cancelable: true, ...mod });
+            window.dispatchEvent(event);
+            const zEvent = new KeyboardEvent('keydown', { key: 'z', cancelable: true, ...mod });
+            window.dispatchEvent(zEvent);
+        }
+        vi.advanceTimersByTime(ACTION_DELAY_MS);
+        expect(handlers.setAutoScroll).not.toHaveBeenCalled();
+        expect(handlers.setZoom).not.toHaveBeenCalled();
+    });
+
+    it('lets Space through to a focused button instead of toggling play', () => {
+        mount();
+        const button = document.createElement('button');
+        const event = press(' ', { code: 'Space', target: button });
+        expect(handlers.togglePlay).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('ignores keys while typing in contenteditable', () => {
+        mount();
+        const editable = document.createElement('div');
+        Object.defineProperty(editable, 'isContentEditable', { value: true });
+        press('s', { target: editable });
+        vi.advanceTimersByTime(ACTION_DELAY_MS);
+        expect(handlers.setAutoScroll).not.toHaveBeenCalled();
+    });
+
+    it('singleKeyEnabled: false disables the character shortcuts but keeps Space and Escape', () => {
+        renderHook(() => useKeyboardShortcuts({ ...handlers, singleKeyEnabled: false }));
+
+        press('z');
+        press('s');
+        press('h');
+        press('-');
+        press('=');
+        press('?');
+        vi.advanceTimersByTime(ACTION_DELAY_MS);
+        expect(handlers.setZoom).not.toHaveBeenCalled();
+        expect(handlers.setAutoScroll).not.toHaveBeenCalled();
+        expect(handlers.humanizeAction).not.toHaveBeenCalled();
+        expect(handlers.setBpmInput).not.toHaveBeenCalled();
+        expect(handlers.setIsHelpOpen).not.toHaveBeenCalledWith(true);
+
+        press(' ', { code: 'Space' });
+        expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
+        press('Escape');
+        expect(handlers.setIsShareOpen).toHaveBeenCalledWith(false);
+        expect(handlers.setIsHelpOpen).toHaveBeenCalledWith(false);
     });
 
     it('removes the keydown listener on unmount', () => {

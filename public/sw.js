@@ -17,9 +17,7 @@ const RUNTIME_MAX_ENTRIES = 400;
 
 // Scope-relative shell assets. self.registration.scope is the absolute URL the
 // SW controls (e.g. https://host/quick-beats/), so these resolve correctly in
-// both dev (/) and prod (/quick-beats/) without hardcoding the base. Hashed
-// /assets/* JS+CSS are intentionally omitted — their names change per build, so
-// they're cached at runtime instead.
+// both dev (/) and prod (/quick-beats/) without hardcoding the base.
 const SHELL_ASSETS = [
   './',
   'index.html',
@@ -31,11 +29,22 @@ const SHELL_ASSETS = [
   'apple-touch-icon.png',
 ];
 
+// The hashed assets/*.js|css of this build, injected by stampServiceWorkerVersion
+// in vite.config.js. They must be precached here rather than left to runtime
+// caching: the SW registers on window load, after the page has already fetched
+// its JS and CSS, so on the visit that installs it those requests are never
+// intercepted — and offline-from-the-first-visit renders a blank page. In dev
+// the placeholder stays and the list is empty; the SW is only registered in
+// production builds.
+const BUILD_ASSETS = [/* __BUILD_ASSETS__ */];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS.map((p) => new URL(p, self.registration.scope).href)))
+      .then((cache) =>
+        cache.addAll(SHELL_ASSETS.concat(BUILD_ASSETS).map((p) => new URL(p, self.registration.scope).href)),
+      )
       .then(() => self.skipWaiting()),
   );
 });

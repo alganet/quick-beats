@@ -93,7 +93,7 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
                         role="menuitemradio"
                         aria-checked={activeOption === opt.id}
                         aria-label={opt.label}
-                        className={`flex items-center cursor-pointer gap-3 px-3 py-2 rounded-md transition-colors ${activeOption === opt.id ? 'bg-primary text-fg' : 'text-fg-secondary'}`}
+                        className={`flex items-center cursor-pointer gap-3 px-3 py-2 rounded-md transition-colors ${activeOption === opt.id ? 'bg-primary-hover text-fg-on-primary' : 'text-fg-secondary'}`}
                     >
                         <span className="text-[10px] font-bold uppercase tracking-wider w-16">{opt.label}</span>
                         <div className="flex gap-1 items-center">

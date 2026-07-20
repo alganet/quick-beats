@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 import { useState } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { Icon } from './Icons';
 
 function HelpSection({ title, children }) {
@@ -28,18 +29,25 @@ function MiniPad({ active, clearing, className = '' }) {
     );
 }
 
-export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }) {
+export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, singleKeyShortcuts = true, onToggleSingleKeyShortcuts }) {
     const [demoZoom, setDemoZoom] = useState(1);
+    const dialogRef = useDialog(isOpen, onClose);
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[110] flex flex-col items-center justify-start p-4 bg-surface-0 overflow-y-auto">
+        <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-title"
+            className="fixed inset-0 z-[110] flex flex-col items-center justify-start p-4 bg-surface-0 overflow-y-auto"
+        >
             <div className="max-w-2xl w-full pb-12 pt-4 md:pt-12">
                 <div className="flex items-center justify-between mb-8 md:mb-12 border-b border-border-dim pb-6">
                     <div className="flex items-center gap-3">
                         <Icon id="help" className="w-6 h-6 text-primary" />
-                        <h1 className="text-2xl md:text-4xl font-black tracking-tighter text-fg uppercase">How to Use</h1>
+                        <h1 id="help-title" className="text-2xl md:text-4xl font-black tracking-tighter text-fg uppercase">How to Use</h1>
                     </div>
                     <button
                         onClick={onClose}
@@ -53,6 +61,10 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                 {showKeyboardCheatsheet && (
                     <HelpSection title="Keyboard Shortcuts">
                         <div className="columns-2 gap-2 text-fg-secondary text-xs">
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">p</div>
+                                <div>Play / Pause</div>
+                            </div>
                             <div className="flex items-center gap-3">
                                 <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Space</div>
                                 <div>Play / Pause</div>
@@ -90,6 +102,24 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                                 <div>Toggle focused step</div>
                             </div>
                         </div>
+                        {onToggleSingleKeyShortcuts && (
+                            <div className="mt-5 pt-4 border-t border-border-dim flex items-center gap-3">
+                                <button
+                                    onClick={onToggleSingleKeyShortcuts}
+                                    aria-pressed={singleKeyShortcuts}
+                                    className={`px-3 py-1.5 border font-mono text-[10px] uppercase tracking-widest transition-colors ${singleKeyShortcuts
+                                        ? 'border-border-default text-fg hover:text-fg-secondary'
+                                        : 'border-border-default text-fg-muted hover:text-fg'
+                                        }`}
+                                >
+                                    Single-key shortcuts: {singleKeyShortcuts ? 'On' : 'Off'}
+                                </button>
+                                <p className="text-fg-secondary text-xs leading-relaxed">
+                                    Turn these off if they conflict with speech input or other
+                                    tools. Space, Enter and Escape keep working.
+                                </p>
+                            </div>
+                        )}
                     </HelpSection>
                 )}
 
@@ -143,7 +173,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                                 <div className="w-8 h-8 flex items-center justify-center bg-surface-inverted text-fg-on-inverted shadow-[0_0_12px_color-mix(in_srgb,var(--color-highlight)_30%,transparent)]">
                                     <Icon id="follow" className="w-4 h-4" />
                                 </div>
-                                <span className="text-[10px] font-mono text-green-400">ON</span>
+                                <span className="text-[10px] font-mono text-success">ON</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <div className="w-8 h-8 flex items-center justify-center bg-surface-5 text-fg-muted">
@@ -167,7 +197,7 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                             <div className="w-8 h-8 flex items-center justify-center bg-surface-inverted text-fg-on-inverted shadow-[0_0_12px_color-mix(in_srgb,var(--color-highlight)_30%,transparent)]">
                                 <Icon id="humanize" className="w-4 h-4" />
                             </div>
-                            <span className="text-[10px] font-mono text-green-400">ON</span>
+                            <span className="text-[10px] font-mono text-success">ON</span>
                         </div>
                         <p className="text-fg-secondary text-xs md:text-sm leading-relaxed">
                             Click to run a trained AI groove model (GrooVAE) entirely in your browser,
@@ -262,17 +292,17 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false }
                                     </div>
                                 </div>
                                 <div className="w-full h-7 mt-1 bg-surface-2 border border-border-dim flex items-center justify-center">
-                                    <span className="text-lg font-bold text-red-900">−</span>
+                                    <span className="text-lg font-bold text-danger">−</span>
                                 </div>
                             </div>
                             <div className="text-fg-secondary text-xs md:text-sm leading-relaxed">
                                 <p className="mb-2">
-                                    When you have more than one measure, a <span className="text-red-400">delete bar</span> appears below the grid.
+                                    When you have more than one measure, a <span className="text-danger">delete bar</span> appears below the grid.
                                     Tap a measure's bar to start deletion.
                                 </p>
                                 <p>
                                     A confirmation prompt will appear with
-                                    {' '}<span className="text-[10px] font-mono font-bold text-red-500 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5">Yes</span>{' '}
+                                    {' '}<span className="text-[10px] font-mono font-bold text-danger bg-danger/10 border border-danger/30 px-1.5 py-0.5">Yes</span>{' '}
                                     and
                                     {' '}<span className="text-[10px] font-mono text-fg-secondary bg-highlight/5 border border-highlight/10 px-1.5 py-0.5">No</span>{' '}
                                     buttons, and the measure will fade to show what will be removed. The prompt auto-dismisses after 3 seconds.

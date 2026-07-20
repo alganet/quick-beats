@@ -157,11 +157,16 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
         return xToStep(x, stepCount, grouping, zoom);
     };
 
-    const handleSeek = (e) => {
-        const newStep = calculateStepFromEvent(e);
+    // Shared by pointer (click position → step) and keyboard (step directly)
+    // seeking, so both stop playback the same way.
+    const seekToStep = (newStep) => {
         if (setStep) setStep(newStep);
         // If currently playing, stop playback when the user seeks via header
         if (isPlaying && typeof togglePlay === 'function') togglePlay();
+    };
+
+    const handleSeek = (e) => {
+        seekToStep(calculateStepFromEvent(e));
     };
 
     // Keyboard grid navigation -------------------------------------------------
@@ -333,6 +338,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                             zoom={zoom}
                             gridOriginOffset={gridOriginOffset}
                             onSeek={handleSeek}
+                            onSeekStep={seekToStep}
                         />
 
                         <div className="relative flex">
@@ -395,6 +401,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                                 style={{ width: ZOOM_CONFIG[zoom].cellHeight }}
                                 className="flex-none w-12 self-stretch flex items-center justify-center cursor-pointer bg-surface-6 hover:bg-surface-4 text-fg-dim hover:text-primary transition-all border border-surface-5 border-r-0 mt-1 mb-4 group/add-btn"
                                 title="Add Measure"
+                                aria-label="Add measure"
                             >
                                 <span className="text-xl font-light transition-transform">+</span>
                             </button>

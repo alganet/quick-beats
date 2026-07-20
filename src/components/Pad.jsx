@@ -41,6 +41,11 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
                 marginRight: (colIdx + 1) % grouping === 0 ? `${config.groupGap}px` : undefined,
             }}
         >
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events --
+                keyboard activation is delegated to the grid container (Sequencer),
+                which handles Enter/Space for the focused pad; the onClick below
+                only catches the synthesized (detail 0) clicks screen readers send
+                instead of key events. */}
             <div
                 ref={padRef}
                 role="checkbox"
@@ -50,11 +55,17 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
                 onFocus={() => onFocusCell?.(rowIdx, colIdx)}
                 data-row={rowIdx}
                 data-col={colIdx}
+                // detail === 0 means a click no pointer produced: screen readers
+                // (VoiceOver, NVDA browse mode) activate a checkbox with a
+                // synthesized click that useLongPress's mousedown/mouseup pair
+                // never sees. Real pointer clicks arrive with detail ≥ 1 and are
+                // handled by the long-press path, so this cannot double-fire.
+                onClick={(e) => { if (e.detail === 0) toggleStep(rowIdx, colIdx); }}
                 {...longPressHandlers}
-                className={`w-full h-full cursor-pointer touch-pan-x relative ${config.radiusClass}
+                className={`pad w-full h-full cursor-pointer touch-pan-x relative ${config.radiusClass}
                     ${isActive
                         ? (humanized ? "bg-accent" : "bg-primary")
-                        : "bg-surface-5 hover:bg-border-medium"}
+                        : "bg-surface-5 hover:bg-border-medium border border-border-bright"}
                 `}
                 data-testid="pad"
             >

@@ -41,14 +41,22 @@ const prefetchKitSamples = () => {
 // keeps its cache name bumping with each release without a manual edit.
 const stampServiceWorkerVersion = () => {
   let outDir = 'dist'
+  let buildAssets = []
   return {
     name: 'stamp-sw-version',
     apply: 'build',
     configResolved(config) { outDir = config.build.outDir },
+    // Collect the emitted hashed JS/CSS names here (closeBundle gets no bundle
+    // argument) so the SW can precache them — see BUILD_ASSETS in public/sw.js.
+    writeBundle(_options, bundle) {
+      buildAssets = Object.keys(bundle).filter((file) => /^assets\/.+\.(js|css)$/.test(file))
+    },
     closeBundle() {
       const swPath = resolve(outDir, 'sw.js')
       if (!existsSync(swPath)) return
-      const src = readFileSync(swPath, 'utf-8').replaceAll('__APP_VERSION__', pkg.version)
+      const src = readFileSync(swPath, 'utf-8')
+        .replaceAll('__APP_VERSION__', pkg.version)
+        .replace('/* __BUILD_ASSETS__ */', buildAssets.map((file) => JSON.stringify(file)).join(', '))
       writeFileSync(swPath, src)
     },
   }

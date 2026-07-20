@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: ISC
 
 
+import { useEffect, useRef } from 'react';
 import { ZOOM_CONFIG } from '../data/sequencerConfig';
 import { measureWidth, ROW_LAYOUT } from '../utils/sequencerGeometry';
 import ConfirmBar from './ConfirmBar';
@@ -55,6 +56,21 @@ export function MeasureControls({
 }) {
     const config = ZOOM_CONFIG[zoom];
 
+    // Resolving the confirmation (Yes or No) unmounts the ConfirmBar, whose
+    // focused button drops keyboard focus to <body>. Hand it back to the delete
+    // strip at that slot (after a delete, the next measure inherits the index;
+    // clamp for the last one). Gated on <body> so a pointer user who resolved
+    // by clicking isn't yanked, mirroring the dialogs' opener restore.
+    const prevPendingRef = useRef(pendingDelete);
+    useEffect(() => {
+        const prev = prevPendingRef.current;
+        prevPendingRef.current = pendingDelete;
+        if (prev === null || pendingDelete !== null) return;
+        if (document.activeElement !== document.body) return;
+        const idx = Math.min(prev, measureCount - 1);
+        document.querySelector(`button[data-measure-control-index="${idx}"]`)?.focus();
+    }, [pendingDelete, measureCount]);
+
     if (measureCount <= 1) return null;
 
     return (
@@ -80,23 +96,41 @@ export function MeasureControls({
                 {[...Array(measureCount)].map((_, measureIdx) => {
                     const isPending = pendingDelete === measureIdx;
                     const width = measureWidth(stepsPerMeasure, grouping, zoom);
+                    const sizeStyle = {
+                        height: ROW_LAYOUT.measureBarPx,
+                        width: `${width}px`,
+                        marginRight: `${config.groupGap}px`
+                    };
 
-                    return (
+                    // Two elements, not one: while idle this is a real <button>
+                    // (keyboard focusable, named), but once pending it hosts the
+                    // ConfirmBar's own Yes/No buttons — and a button may not
+                    // contain buttons.
+                    return isPending ? (
                         <div
                             key={measureIdx}
-                            className={`group flex-none flex cursor-pointer transition-left border border-surface-5 relative
-                                ${isPending
-                                    ? 'bg-red-500/10 z-50 overflow-visible'
-                                    : 'bg-surface-6 hover:bg-surface-4 text-danger-dim hover:text-red-500'
-                                }
-                            `}
-                            style={{
-                                height: ROW_LAYOUT.measureBarPx,
-                                width: `${width}px`,
-                                marginRight: `${config.groupGap}px`
-                            }}
+                            className="group flex-none flex transition-left border border-surface-5 relative bg-danger/10 z-50 overflow-visible"
+                            style={sizeStyle}
+                            data-measure-control-index={measureIdx}
+                        >
+                            <StickyWrapper className="z-50">
+                                <div className="flex shadow-xl">
+                                    <ConfirmBar
+                                        measureIndex={measureIdx}
+                                        onConfirm={() => { removeMeasure && removeMeasure(measureIdx); setPendingDelete(null); }}
+                                        onCancel={() => setPendingDelete(null)}
+                                    />
+                                </div>
+                            </StickyWrapper>
+                        </div>
+                    ) : (
+                        <button
+                            key={measureIdx}
+                            type="button"
+                            aria-label={`Delete measure ${measureIdx + 1}`}
+                            className="group flex-none flex cursor-pointer transition-left border border-surface-5 relative bg-surface-6 hover:bg-surface-4 text-danger-dim hover:text-danger"
+                            style={sizeStyle}
                             onClick={(event) => {
-                                if (isPending) return;
                                 if (pendingDelete === null) {
                                     centerMeasureInView(event.currentTarget);
                                     setPendingDelete(measureIdx);
@@ -104,22 +138,10 @@ export function MeasureControls({
                             }}
                             data-measure-control-index={measureIdx}
                         >
-                            {isPending ? (
-                                <StickyWrapper className="z-50">
-                                    <div className="flex shadow-xl">
-                                        <ConfirmBar
-                                            measureIndex={measureIdx}
-                                            onConfirm={() => { removeMeasure && removeMeasure(measureIdx); setPendingDelete(null); }}
-                                            onCancel={() => setPendingDelete(null)}
-                                        />
-                                    </div>
-                                </StickyWrapper>
-                            ) : (
-                                <StickyIconWrapper>
-                                    <span className="align-baseline text-md font-bold transition-transform group-hover:-translate-y-0.5">x</span>
-                                </StickyIconWrapper>
-                            )}
-                        </div>
+                            <StickyIconWrapper>
+                                <span aria-hidden="true" className="align-baseline text-md font-bold transition-transform group-hover:-translate-y-0.5">x</span>
+                            </StickyIconWrapper>
+                        </button>
                     );
                 })}
             </div>

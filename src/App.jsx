@@ -101,10 +101,23 @@ function App() {
   const [previewSig, setPreviewSig] = useState(_initialHash?.sig ?? null);
   const [bpmInput, setBpmInput] = useState(_initialHash?.bpm ?? 120);
   const [grid, setGrid] = useState(_initialHash?.grid ?? []);
+  // Default off under prefers-reduced-motion: the playhead auto-scroll is a
+  // recurring half-viewport jump, and the toggle to disable it only renders
+  // during playback — too late for someone the motion harms. A saved choice
+  // still wins either way.
   const [autoScroll, setAutoScroll] = useState(() => {
     const saved = localStorage.getItem('qb-auto-scroll');
-    return saved !== null ? JSON.parse(saved) : true;
+    if (saved !== null) return JSON.parse(saved);
+    return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   });
+  // Same "chosen" split as zoom below: only a deliberate toggle is persisted.
+  // Writing the seeded default back would freeze it, and someone who never
+  // touched the toggle should keep following their OS motion preference.
+  const [autoScrollChosen, setAutoScrollChosen] = useState(() => localStorage.getItem('qb-auto-scroll') !== null);
+  const chooseAutoScroll = useCallback((updater) => {
+    setAutoScrollChosen(true);
+    setAutoScroll(updater);
+  }, []);
   const [canScroll, setCanScroll] = useState(false);
   // qb-zoom means "the user picked this", not merely "this is the current zoom".
   // Until they do, the sequencer fits the zoom to the height it has; the moment
@@ -120,8 +133,8 @@ function App() {
 
   // Persist UI preferences
   useEffect(() => {
-    localStorage.setItem('qb-auto-scroll', JSON.stringify(autoScroll));
-  }, [autoScroll]);
+    if (autoScrollChosen) localStorage.setItem('qb-auto-scroll', JSON.stringify(autoScroll));
+  }, [autoScroll, autoScrollChosen]);
 
   // Only a deliberate choice is worth remembering. Persisting an auto-fitted
   // zoom would make the next visit read it back as a preference and stop
@@ -137,6 +150,16 @@ function App() {
 
   // Global keyboard shortcuts — the cheatsheet only helps where there's a keyboard.
   const showKeyboardCheatsheet = useMediaQuery('(pointer: fine)');
+
+  // WCAG 2.1.4: single-character shortcuts must be disableable — speech-input
+  // software turns ordinary dictation into a stream of them.
+  const [singleKeyShortcuts, setSingleKeyShortcuts] = useState(() => {
+    const saved = localStorage.getItem('qb-single-key-shortcuts');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  useEffect(() => {
+    localStorage.setItem('qb-single-key-shortcuts', JSON.stringify(singleKeyShortcuts));
+  }, [singleKeyShortcuts]);
 
   // Humanize intent layer: on/off toggle, streamed-layer application, idle
   // re-humanize, BPM rescale, signature-change reset, and derived button status.
@@ -156,10 +179,11 @@ function App() {
     togglePlay,
     setBpmInput,
     setZoom: chooseZoom,
-    setAutoScroll,
+    setAutoScroll: chooseAutoScroll,
     setIsHelpOpen,
     setIsShareOpen,
     humanizeAction,
+    singleKeyEnabled: singleKeyShortcuts,
   });
 
   // Adopt a beat that arrives in the URL after load — an installed PWA gets a
@@ -278,7 +302,13 @@ function App() {
     return (
       <>
         <IconSprite />
-        <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} showKeyboardCheatsheet={showKeyboardCheatsheet} />
+        <Help
+          isOpen={isHelpOpen}
+          onClose={() => setIsHelpOpen(false)}
+          showKeyboardCheatsheet={showKeyboardCheatsheet}
+          singleKeyShortcuts={singleKeyShortcuts}
+          onToggleSingleKeyShortcuts={() => setSingleKeyShortcuts((v) => !v)}
+        />
         <Setup
           onSelect={handlePreview}
           onConfirm={handleConfirm}
@@ -295,7 +325,7 @@ function App() {
   }
 
   return (
-    <div className="bg-surface-1 h-dvh safe-inset flex flex-col text-fg overflow-hidden w-fit max-w-screen min-w-[360px]">
+    <div className="bg-surface-1 h-dvh safe-inset flex flex-col text-fg overflow-hidden w-fit max-w-screen">
       <IconSprite />
       {/* Screen-reader announcement of transport state (visually hidden). */}
       <div className="sr-only" role="status" aria-live="polite">{isPlaying ? 'Playing' : 'Paused'}</div>
@@ -333,6 +363,7 @@ function App() {
                   onClick={rotate.isFullscreen ? rotate.exit : rotate.enter}
                   className={HEADER_ACTION_CLASS}
                   title={rotate.isFullscreen ? 'Exit fullscreen' : rotate.canRotate ? 'Fullscreen & landscape' : 'Fullscreen'}
+                  aria-label={rotate.isFullscreen ? 'Exit fullscreen' : rotate.canRotate ? 'Fullscreen & landscape' : 'Fullscreen'}
                 >
                   <Icon id={rotate.isFullscreen ? 'fullscreen-exit' : 'fullscreen'} className="w-3 h-3" />
                 </button>
@@ -341,6 +372,7 @@ function App() {
                 onClick={toggleTheme}
                 className={HEADER_ACTION_CLASS}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               >
                 <Icon id={theme === 'dark' ? 'sun' : 'moon'} className="w-3 h-3" />
               </button>
@@ -372,6 +404,8 @@ function App() {
           isOpen={isHelpOpen}
           onClose={() => setIsHelpOpen(false)}
           showKeyboardCheatsheet={showKeyboardCheatsheet}
+          singleKeyShortcuts={singleKeyShortcuts}
+          onToggleSingleKeyShortcuts={() => setSingleKeyShortcuts((v) => !v)}
         />
 
         <ShareModal
@@ -387,7 +421,7 @@ function App() {
             bpm={bpmInput}
             setBpm={setBpmInput}
             autoScroll={autoScroll}
-            setAutoScroll={setAutoScroll}
+            setAutoScroll={chooseAutoScroll}
             canScroll={canScroll}
             zoom={zoom}
             setZoom={chooseZoom}
@@ -418,7 +452,7 @@ function App() {
           stepsPerBeat={timeSignature.stepsPerBeat}
           grouping={timeSignature.grouping}
           autoScroll={autoScroll}
-          setAutoScroll={setAutoScroll}
+          setAutoScroll={chooseAutoScroll}
           setCanScroll={setCanScroll}
           fitZoomToHeight={!zoomChosen}
           onFitZoom={setZoom}

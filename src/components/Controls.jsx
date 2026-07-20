@@ -76,8 +76,12 @@ export default function Controls({
                         <div className="text-[10px] font-bold font-mono uppercase m-2 text-center">{bpm}</div>
                         <div className="text-[10px] font-mono m-2">BPM</div>
                     </div>
+                    {/* aria-labels because name-from-content would be the raw
+                        punctuation glyphs — "minus, button" — and title never
+                        becomes the accessible name when content exists. */}
                     <button
                         title="Decrease BPM [-]"
+                        aria-label="Decrease BPM"
                         className="hover:text-fg text-fg-muted text-sm min-w-6 w-6 h-6 pl-1 text-center"
                         onClick={() => setBpm(clampBpm(bpm - 1))}
                     >−</button>
@@ -87,12 +91,15 @@ export default function Controls({
                             min="60"
                             max="240"
                             value={bpm}
+                            aria-label="Tempo"
+                            aria-valuetext={`${bpm} BPM`}
                             onChange={(e) => setBpm(parseInt(e.target.value))}
                             className="tempo-input mt-1.5 pl-1"
                     />
                     </div>
                     <button
                         title="Increase BPM [+]"
+                        aria-label="Increase BPM"
                         className="hover:text-fg text-fg-muted text-sm min-w-6 w-6 h-6 pr-1 text-center"
                         onClick={() => setBpm(clampBpm(bpm + 1))}
                     >＋</button>
@@ -119,7 +126,7 @@ export default function Controls({
                     onClick={scheduleZoomToggle}
                     className="flex-none w-8 h-8 flex items-center rounded-sm justify-center transition-all bg-surface-5 text-fg-secondary hover:text-fg"
                     title={`Change Zoom Level [z]`}
-                    aria-label="Toggle Zoom"
+                    aria-label={`Zoom: ${['small', 'medium', 'large'][zoom] ?? zoom}`}
                 >
                     <Icon id={`zoom-${zoom}`} className="w-4 h-4" />
                 </button>
@@ -132,7 +139,8 @@ export default function Controls({
                             : "bg-surface-5 text-fg-muted hover:text-fg-secondary"
                             }`}
                         title={autoScroll ? "Auto-scroll ON [s]" : "Auto-scroll OFF [s]"}
-                        aria-label="Toggle auto-scroll"
+                        aria-label="Auto-scroll"
+                        aria-pressed={autoScroll}
                     >
                         <Icon id={autoScroll ? "follow" : "unfollow"} className="w-4 h-4" />
                     </button>

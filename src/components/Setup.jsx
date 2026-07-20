@@ -12,10 +12,10 @@ export default function Setup({
     kits, activeKit, switchingKit, kitProgress, onSelectKit,
 }) {
     return (
-        <div className="min-w-[360px] z-40 min-h-dvh w-full flex flex-col items-center justify-start md:justify-center bg-surface-0 safe-px-6 overflow-y-auto py-12 md:py-6 relative short-landscape:h-dvh short-landscape:overflow-y-hidden short-landscape:justify-center">
+        <div className="z-40 min-h-dvh w-full flex flex-col items-center justify-start md:justify-center bg-surface-0 safe-px-6 overflow-y-auto py-12 md:py-6 relative short-landscape:h-dvh short-landscape:overflow-y-hidden short-landscape:justify-center">
             <button
                 onClick={onShowHelp}
-                className="absolute top-4 right-6 text-fg-faint hover:text-fg transition-colors font-mono text-[10px] uppercase tracking-tighter"
+                className="absolute top-4 right-6 text-fg-muted hover:text-fg transition-colors font-mono text-[10px] uppercase tracking-tighter"
             >
                 v{__APP_VERSION__}
             </button>
@@ -39,7 +39,7 @@ export default function Setup({
                         {/* Drum-sound picker — the preview plays the chosen kit */}
                         {onSelectKit && (
                             <div className="flex items-center justify-center gap-2 mt-5 short-landscape:justify-start short-landscape:mt-4">
-                                <span className="text-fg-faint text-[10px] font-mono uppercase tracking-[0.2em]">Drum Kit</span>
+                                <span className="text-fg-muted text-[10px] font-mono uppercase tracking-[0.2em]">Drum Kit</span>
                                 {/* The popover hangs off the button's right edge, which fits while
                                     this sits centred in portrait. In short-landscape the button moves
                                     to the left edge of the branding column, where that would open
@@ -77,7 +77,7 @@ export default function Setup({
                         {selectedSig && (
                             <button
                                 onClick={onConfirm}
-                                className="w-full md:w-64 bg-primary text-fg font-black py-4 hover:bg-primary-hover transition-all tracking-[0.3em] uppercase text-sm pointer-events-auto short-landscape:w-full"
+                                className="w-full md:w-64 bg-primary-hover text-fg-on-primary font-black py-4 hover:bg-primary transition-all tracking-[0.3em] uppercase text-sm pointer-events-auto short-landscape:w-full"
                             >
                                 Confirm & Start
                             </button>

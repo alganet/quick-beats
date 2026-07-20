@@ -77,17 +77,21 @@ export function gridContentHeightPx({ zoom, rowCount, measureCount, mobile = isM
 
 /**
  * The largest zoom no bigger than `maxZoom` whose grid fits `availableHeightPx`,
- * falling back to the smallest when nothing does.
+ * falling back to `minZoom` when nothing does.
  *
  * Deliberately never returns more than `maxZoom`: this exists to rescue a grid
  * that does not fit, not to inflate one that already does. Growing the pads on a
  * tall screen would also cost horizontal steps, which nobody asked for.
+ *
+ * `minZoom` exists for coarse pointers, where zoom 0's 20px pads sit under the
+ * 24px WCAG 2.5.8 minimum target size — better a grid that scrolls than pads a
+ * finger cannot hit.
  */
-export function fitZoom({ availableHeightPx, rowCount, measureCount, mobile, maxZoom = DEFAULT_ZOOM }) {
-    for (let zoom = maxZoom; zoom > 0; zoom--) {
+export function fitZoom({ availableHeightPx, rowCount, measureCount, mobile, maxZoom = DEFAULT_ZOOM, minZoom = 0 }) {
+    for (let zoom = maxZoom; zoom > minZoom; zoom--) {
         if (gridContentHeightPx({ zoom, rowCount, measureCount, mobile }) <= availableHeightPx) return zoom;
     }
-    return 0;
+    return minZoom;
 }
 
 export function stepToX(step, grouping, zoom) {

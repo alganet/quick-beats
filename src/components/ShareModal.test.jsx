@@ -44,8 +44,10 @@ describe('ShareModal', () => {
         const onClose = vi.fn();
         render(<ShareModal {...defaultProps} onClose={onClose} />);
 
-        const closeButtons = screen.getAllByRole('button');
-        // Click the X button (first close button)
+        // Both the × and the bottom button carry the accessible name "Close" —
+        // the × via aria-label, since "×" would announce as "times".
+        const closeButtons = screen.getAllByRole('button', { name: /close/i });
+        expect(closeButtons).toHaveLength(2);
         fireEvent.click(closeButtons[0]);
 
         expect(onClose).toHaveBeenCalledTimes(1);
@@ -55,8 +57,7 @@ describe('ShareModal', () => {
         const onClose = vi.fn();
         render(<ShareModal {...defaultProps} onClose={onClose} />);
 
-        const closeButton = screen.getByRole('button', { name: /close/i });
-        fireEvent.click(closeButton);
+        fireEvent.click(screen.getByText('Close'));
 
         expect(onClose).toHaveBeenCalledTimes(1);
     });

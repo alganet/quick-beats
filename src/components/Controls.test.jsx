@@ -124,7 +124,7 @@ describe('Controls', () => {
             <Controls isPlaying={true} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={true} />
         );
 
-        const toggle = screen.getByRole('button', { name: /toggle auto-scroll/i });
+        const toggle = screen.getByRole('button', { name: /auto-scroll/i });
         expect(toggle).toBeInTheDocument();
         expect(toggle).toHaveAttribute('title', 'Auto-scroll ON [s]');
     });
@@ -138,7 +138,7 @@ describe('Controls', () => {
             <Controls isPlaying={true} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={true} />
         );
 
-        const toggle = screen.getByRole('button', { name: /toggle auto-scroll/i });
+        const toggle = screen.getByRole('button', { name: /auto-scroll/i });
         fireEvent.click(toggle);
 
         expect(setAutoScroll).not.toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe('Controls', () => {
             <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={false} />
         );
 
-        const toggle = screen.queryByRole('button', { name: /toggle auto-scroll/i });
+        const toggle = screen.queryByRole('button', { name: /auto-scroll/i });
         expect(toggle).not.toBeInTheDocument();
     });
 
@@ -181,7 +181,7 @@ describe('Controls', () => {
             <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} zoom={1} setZoom={setZoom} />
         );
 
-        const zoomToggle = screen.getByRole('button', { name: /toggle zoom/i });
+        const zoomToggle = screen.getByRole('button', { name: /zoom/i });
         fireEvent.click(zoomToggle);
 
         expect(setZoom).not.toHaveBeenCalled();
@@ -232,7 +232,7 @@ describe('Controls', () => {
             <Controls isPlaying={false} togglePlay={togglePlay} bpm={120} setBpm={setBpm} zoom={1} setZoom={setZoom} />
         );
 
-        const zoomToggle = screen.getByRole('button', { name: /toggle zoom/i });
+        const zoomToggle = screen.getByRole('button', { name: /zoom/i });
         fireEvent.click(zoomToggle);
         fireEvent.click(zoomToggle);
 
@@ -250,7 +250,7 @@ describe('Controls', () => {
             <Controls isPlaying={true} togglePlay={togglePlay} bpm={120} setBpm={setBpm} autoScroll={true} setAutoScroll={setAutoScroll} canScroll={true} zoom={1} setZoom={vi.fn()} />
         );
 
-        const toggle = screen.getByRole('button', { name: /toggle auto-scroll/i });
+        const toggle = screen.getByRole('button', { name: /auto-scroll/i });
         fireEvent.click(toggle);
         fireEvent.click(toggle);
 
