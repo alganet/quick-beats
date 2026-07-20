@@ -64,7 +64,7 @@ export default function Controls({
                         ? "bg-danger text-fg"
                         : "bg-success text-fg"
                         }`}
-                    title={isPlaying ? "Stop [Space]" : "Play [Space]"}
+                    title={isPlaying ? "Stop [P]" : "Play [P]"}
                     aria-label={isPlaying ? "Stop" : "Play"}
                 >
                     <Icon id={isPlaying ? "stop" : "play"} className="w-5 h-5" />

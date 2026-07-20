@@ -38,14 +38,14 @@ describe('useKeyboardShortcuts', () => {
 
     const mount = () => renderHook(() => useKeyboardShortcuts(handlers));
 
-    it('Space toggles play and prevents default', () => {
+    it('does not bind Space — it keeps its native/ARIA role', () => {
         mount();
         const event = press(' ', { code: 'Space' });
-        expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
-        expect(event.defaultPrevented).toBe(true);
+        expect(handlers.togglePlay).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
     });
 
-    it('p toggles play (single-key alternative to Space)', () => {
+    it('p toggles play', () => {
         mount();
         press('p');
         expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe('useKeyboardShortcuts', () => {
         expect(handlers.setAutoScroll).not.toHaveBeenCalled();
     });
 
-    it('singleKeyEnabled: false disables the character shortcuts but keeps Space and Escape', () => {
+    it('singleKeyEnabled: false disables the character shortcuts but keeps Escape', () => {
         renderHook(() => useKeyboardShortcuts({ ...handlers, singleKeyEnabled: false }));
 
         press('z');
@@ -181,9 +181,8 @@ describe('useKeyboardShortcuts', () => {
         expect(handlers.humanizeAction).not.toHaveBeenCalled();
         expect(handlers.setBpmInput).not.toHaveBeenCalled();
         expect(handlers.openHelp).not.toHaveBeenCalled();
+        expect(handlers.togglePlay).not.toHaveBeenCalled();
 
-        press(' ', { code: 'Space' });
-        expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
         press('Escape');
         expect(handlers.onCloseOverlay).toHaveBeenCalledTimes(1);
     });
@@ -191,7 +190,7 @@ describe('useKeyboardShortcuts', () => {
     it('removes the keydown listener on unmount', () => {
         const { unmount } = mount();
         unmount();
-        press(' ', { code: 'Space' });
+        press('p');
         expect(handlers.togglePlay).not.toHaveBeenCalled();
     });
 

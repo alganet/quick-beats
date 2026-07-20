@@ -163,21 +163,23 @@ describe('Pad', () => {
             y: 200,
             row: 0,
             col: 0,
-            source: 'pointer'
+            source: 'drag' // touch/pen long-press → drag-to-select overlay
         }));
     });
 
-    it('opens the fill menu on right-click (desktop equivalent of long-press)', () => {
+    it('opens the persistent menu on right-click and suppresses the native menu', () => {
         vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
             left: 10, top: 20, width: 40, height: 40, right: 50, bottom: 60, x: 10, y: 20, toJSON: () => {}
         });
+        defaultProps.setMenuState.mockClear();
         render(<Pad {...defaultProps} />);
         const pad = screen.getByTestId('pad');
 
-        fireEvent.contextMenu(pad);
-
+        // preventDefault (native menu suppressed) AND opens the clickable 'menu' mode.
+        const notPrevented = fireEvent.contextMenu(pad);
+        expect(notPrevented).toBe(false); // preventDefault was called
         expect(defaultProps.setMenuState).toHaveBeenCalledWith(expect.objectContaining({
-            isOpen: true, source: 'pointer', row: 0, col: 0,
+            isOpen: true, source: 'menu', row: 0, col: 0, activeOption: 'repeat',
         }));
     });
 
@@ -187,23 +189,6 @@ describe('Pad', () => {
         expect(pad).toHaveClass('[touch-action:pan-x_pinch-zoom]');
     });
 
-    it('exposes no fill-menu disclosure when the menu is closed', () => {
-        render(<Pad {...defaultProps} />);
-        const pad = screen.getByTestId('pad');
-        expect(pad).not.toHaveAttribute('aria-haspopup');
-        expect(pad).not.toHaveAttribute('aria-expanded');
-    });
-
-    it('exposes the trigger disclosure while its menu is open', () => {
-        // Virtual focus + the active option live on the menu itself; the pad is
-        // just the trigger, so it advertises only the open popup.
-        render(<Pad {...defaultProps} menuOpen />);
-        const pad = screen.getByTestId('pad');
-        expect(pad).toHaveAttribute('aria-haspopup', 'menu');
-        expect(pad).toHaveAttribute('aria-expanded', 'true');
-        expect(pad).not.toHaveAttribute('aria-activedescendant');
-        expect(pad).not.toHaveAttribute('aria-owns');
-    });
 
     it('applies faded styles to the cell when faded prop is true', () => {
         render(<Pad {...defaultProps} faded={true} />);

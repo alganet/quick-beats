@@ -9,7 +9,7 @@ import { FILL_MODES } from '../data/sequencerConfig';
 const FINGER_CLEARANCE_PX = 130;
 const EDGE_PADDING_PX = 12;
 
-const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, ref) => {
+const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup, clickable = false, onSelect, onHover }, ref) => {
     const [offset, setOffset] = useState(0);
     const [yOffset, setYOffset] = useState(0);
     const menuRef = useRef(null);
@@ -81,7 +81,12 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
             // cycles, the referenced fill-<id> item is announced natively.
             tabIndex={-1}
             aria-activedescendant={activeOption ? `fill-${activeOption}` : undefined}
-            className="fixed z-[100] bg-surface-3 border border-border-default shadow-2xl rounded-lg overflow-hidden pointer-events-none focus:outline-none"
+            // Suppress the browser's native context menu, which the Menu key would
+            // otherwise stack on top of this one (focus has moved here by then).
+            onContextMenu={(e) => e.preventDefault()}
+            // 'drag' mode is a non-interactive overlay tracked by pointer position,
+            // so it must not capture events; 'menu' mode's items are clickable.
+            className={`fixed z-[100] bg-surface-3 border border-border-default shadow-2xl rounded-lg overflow-hidden focus:outline-none ${clickable ? 'pointer-events-auto' : 'pointer-events-none'}`}
             style={{
                 left: x + offset,
                 top: y - FINGER_CLEARANCE_PX + yOffset,
@@ -93,12 +98,20 @@ const ContextMenu = forwardRef(({ x, y, activeOption, grouping, colInGroup }, re
                     keyboard cycling can't drift apart; unknown ids are skipped
                     rather than crashing the render. */}
                 {FILL_MODES.map((id) => OPTION_META[id]).filter(Boolean).map((opt) => (
+                    // Virtual-focus (activedescendant) menu: the menu container holds
+                    // focus and keyboard nav (arrows/Enter via useSequencerSelection);
+                    // items aren't individually focusable and the onClick is the mouse
+                    // equivalent of that keyboard path — so the a11y rules that want a
+                    // focusable item with its own key handler don't apply here.
+                    // eslint-disable-next-line jsx-a11y/interactive-supports-focus, jsx-a11y/click-events-have-key-events
                     <div
                         key={opt.id}
                         id={`fill-${opt.id}`}
                         role="menuitemradio"
                         aria-checked={activeOption === opt.id}
                         aria-label={opt.label}
+                        onClick={clickable ? () => onSelect?.(opt.id) : undefined}
+                        onMouseEnter={clickable ? () => onHover?.(opt.id) : undefined}
                         className={`flex items-center cursor-pointer gap-3 px-3 py-2 rounded-md transition-colors ${activeOption === opt.id ? 'bg-primary-hover text-fg-on-primary' : 'text-fg-secondary'}`}
                     >
                         <span className="text-[11px] font-bold uppercase tracking-wider w-16">{opt.label}</span>

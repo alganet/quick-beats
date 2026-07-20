@@ -522,7 +522,7 @@ describe('App', () => {
         expect(mockUseAudio.togglePlay).toHaveBeenCalled();
     });
 
-    it('supports keyboard shortcuts (space = play/pause)', () => {
+    it('supports keyboard shortcuts (p = play/pause; Space is not bound)', () => {
         mockUseAudio.isLoaded = true;
         render(<App />);
         fireEvent.click(screen.getByText('Select 4/4'));
@@ -530,6 +530,8 @@ describe('App', () => {
 
         mockUseAudio.togglePlay.mockClear();
         fireEvent.keyDown(window, { key: ' ', code: 'Space' });
+        expect(mockUseAudio.togglePlay).not.toHaveBeenCalled();
+        fireEvent.keyDown(window, { key: 'p' });
         expect(mockUseAudio.togglePlay).toHaveBeenCalled();
     });
 

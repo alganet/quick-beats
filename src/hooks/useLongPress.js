@@ -28,6 +28,10 @@ export function useLongPress({ onLongPress, onClick, delay = 300 }) {
     const start = useCallback((e) => {
         // Ignore synthetic mouse events that follow a touch
         if (shouldIgnoreMouseEvent(e)) return;
+        // Only the primary button starts a press. A right/middle button is for the
+        // context menu (handled separately) and must not arm a long-press or a
+        // click-on-release toggle.
+        if (typeof e.button === 'number' && e.button !== 0) return;
 
         const isTouch = !!e.touches;
         if (isTouch) lastTouchRef.current = Date.now();

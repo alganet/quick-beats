@@ -82,10 +82,6 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                                 <div>Play / Pause</div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Space</div>
-                                <div>Play / Pause</div>
-                            </div>
-                            <div className="flex items-center gap-3">
                                 <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">-</div>
                                 <div>Decrease BPM</div>
                             </div>
@@ -127,6 +123,10 @@ export default function Help({ isOpen, onClose, showKeyboardCheatsheet = false, 
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">Menu</div>
+                                <div>Fill patterns</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="font-mono bg-surface-0 border border-border-dim px-2 w-12 text-center py-1 text-fg text-[11px]">m</div>
                                 <div>Fill patterns</div>
                             </div>
                         </div>

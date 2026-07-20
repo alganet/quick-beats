@@ -6,10 +6,15 @@ import { memo, useRef, useCallback } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
 import { Icon } from './Icons';
 
-export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded, isFocused, onFocusCell, menuOpen = false }) => {
+export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping, config, toggleStep, setMenuState, faded, isFocused, onFocusCell }) => {
     const padRef = useRef(null);
 
-    const onLongPress = useCallback(() => {
+    // Open the fill menu for this pad in one of two modes:
+    //   'drag' — touch/pen long-press: a non-focusable overlay you drag across and
+    //            release on an option (handled in useSequencerSelection).
+    //   'menu' — right-click or keyboard: a real, focusable menu you click or
+    //            arrow through; stays open until you pick an option or dismiss it.
+    const openMenu = useCallback((source) => {
         const rect = padRef.current.getBoundingClientRect();
         setMenuState({
             isOpen: true,
@@ -17,10 +22,11 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
             y: rect.top,
             row: rowIdx,
             col: colIdx,
-            activeOption: null,
-            source: 'pointer'
+            activeOption: source === 'drag' ? null : 'repeat',
+            source,
         });
     }, [rowIdx, colIdx, setMenuState]);
+    const onLongPress = useCallback(() => openMenu('drag'), [openMenu]);
 
     const onClick = useCallback(() => {
         toggleStep(rowIdx, colIdx);
@@ -58,22 +64,19 @@ export const Pad = ({ isActive, humanized, instrument, rowIdx, colIdx, grouping,
                 onFocus={() => onFocusCell?.(rowIdx, colIdx)}
                 data-row={rowIdx}
                 data-col={colIdx}
-                // The pad is the menu's trigger: expose the disclosure while its
-                // fill menu is open. Virtual focus and the active option live on
-                // the menu itself (a valid activedescendant host), which takes
-                // focus for the duration; both attrs are absent when it's closed.
-                aria-haspopup={menuOpen ? 'menu' : undefined}
-                aria-expanded={menuOpen ? true : undefined}
                 // detail === 0 means a click no pointer produced: screen readers
                 // (VoiceOver, NVDA browse mode) activate a checkbox with a
                 // synthesized click that useLongPress's mousedown/mouseup pair
                 // never sees. Real pointer clicks arrive with detail ≥ 1 and are
                 // handled by the long-press path, so this cannot double-fire.
                 onClick={(e) => { if (e.detail === 0) toggleStep(rowIdx, colIdx); }}
-                // A mouse right-click is the desktop idiom for the fill menu that
-                // long-press opens on touch; without this it fell through to the
-                // browser's native context menu.
-                onContextMenu={(e) => { e.preventDefault(); onLongPress(); }}
+                // Right-click opens the persistent 'menu' mode and suppresses the
+                // browser's native menu (which would otherwise stack on top).
+                // useLongPress ignores the right button, so the release neither
+                // toggles the pad nor closes the menu. The Menu key doesn't reach
+                // this — opening moves focus into the menu, so its contextmenu event
+                // targets the menu (handled there), not the pad.
+                onContextMenu={(e) => { e.preventDefault(); openMenu('menu'); }}
                 {...longPressHandlers}
                 className={`pad w-full h-full cursor-pointer [touch-action:pan-x_pinch-zoom] relative ${config.radiusClass}
                     ${isActive

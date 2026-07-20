@@ -17,13 +17,18 @@ describe('Help', () => {
     it('shows keyboard cheatsheet when showKeyboardCheatsheet=true', () => {
         render(<Help isOpen={true} onClose={() => {}} showKeyboardCheatsheet={true} />);
         expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument();
-        // Two rows now document Play / Pause: the p key and Space.
-        expect(screen.getAllByText('Play / Pause')).toHaveLength(2);
+        // Play / Pause is p alone — Space is unbound as a global shortcut (it
+        // keeps its native roles) and must not be advertised as one.
+        expect(screen.getAllByText('Play / Pause')).toHaveLength(1);
+        expect(screen.getByText('p')).toBeInTheDocument();
+        expect(screen.queryByText('Space')).not.toBeInTheDocument();
         expect(screen.getByText('Toggle zoom')).toBeInTheDocument();
         // The previously-undocumented shortcuts that actually exist.
         expect(screen.getByText('First step')).toBeInTheDocument();
         expect(screen.getByText('Last step')).toBeInTheDocument();
-        expect(screen.getByText('Fill patterns')).toBeInTheDocument();
+        // Fill patterns opens from the Menu key or its m fallback.
+        expect(screen.getAllByText('Fill patterns')).toHaveLength(2);
+        expect(screen.getByText('m')).toBeInTheDocument();
         expect(screen.getByText(/seek the playhead/i)).toBeInTheDocument();
     });
 

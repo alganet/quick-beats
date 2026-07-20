@@ -67,7 +67,7 @@ vi.mock('../hooks/useAutoScroll', () => ({
 const { mockSetMenuState } = vi.hoisted(() => ({ mockSetMenuState: vi.fn() }));
 vi.mock('../hooks/useSequencerSelection', () => ({
     useSequencerSelection: () => ({
-        menuState: { isOpen: false, source: 'pointer' },
+        menuState: { isOpen: false, source: 'drag' },
         setMenuState: mockSetMenuState,
         menuRef: { current: null }
     })
@@ -237,68 +237,45 @@ describe('Sequencer', () => {
         }
     });
 
-    it('toggles on Space when the pad was focused via keyboard (consumes the key)', () => {
+    it('toggles the focused pad on Space and consumes the key (ARIA checkbox default)', () => {
         const windowKeySpy = vi.fn();
         window.addEventListener('keydown', windowKeySpy);
         try {
             render(<Sequencer {...defaultProps} />);
-            fireEvent.mouseDown(document);                      // start in pointer modality...
-            fireEvent.keyDown(document, { key: 'Tab' });        // ...then keyboard flips it back
-            fireEvent.focus(screen.getByTestId('cell-0-0'));    // focus arrives via keyboard
+            fireEvent.focus(screen.getByTestId('cell-0-0'));
             windowKeySpy.mockClear();
             fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: ' ' });
             expect(defaultProps.toggleStep).toHaveBeenCalledWith(0, 0);
-            expect(windowKeySpy).not.toHaveBeenCalled(); // consumed, App's play never fires
+            // Consumed (preventDefault + stopPropagation) so the page doesn't scroll.
+            expect(windowKeySpy).not.toHaveBeenCalled();
         } finally {
             window.removeEventListener('keydown', windowKeySpy);
         }
     });
 
-    it('lets Space bubble to global play when the pad was focused via pointer', () => {
-        const windowKeySpy = vi.fn();
-        window.addEventListener('keydown', windowKeySpy);
-        try {
-            render(<Sequencer {...defaultProps} />);
-            fireEvent.mouseDown(document);                      // input modality -> pointer
-            fireEvent.focus(screen.getByTestId('cell-0-0'));    // focus arrives via pointer
-            windowKeySpy.mockClear();
-            fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: ' ' });
-            expect(defaultProps.toggleStep).not.toHaveBeenCalled();
-            expect(windowKeySpy).toHaveBeenCalled(); // bubbles → App's Space=play would fire
-        } finally {
-            window.removeEventListener('keydown', windowKeySpy);
-        }
-    });
-
-    it('reverts to play when a keyboard-focused pad is then clicked (no refocus fires)', () => {
-        const windowKeySpy = vi.fn();
-        window.addEventListener('keydown', windowKeySpy);
-        try {
-            render(<Sequencer {...defaultProps} />);
-            fireEvent.keyDown(document, { key: 'Tab' });
-            fireEvent.focus(screen.getByTestId('cell-0-0'));     // keyboard focus -> Space would toggle
-            fireEvent.pointerDown(screen.getByTestId('cell-0-0')); // pointer intent on the focused pad
-            windowKeySpy.mockClear();
-            fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: ' ' });
-            expect(defaultProps.toggleStep).not.toHaveBeenCalled();
-            expect(windowKeySpy).toHaveBeenCalled(); // bubbles → play
-        } finally {
-            window.removeEventListener('keydown', windowKeySpy);
-        }
-    });
-
-    it('opens the bulk-fill menu from the keyboard (ContextMenu / Shift+F10)', () => {
+    it('opens the bulk-fill menu from the keyboard (ContextMenu / Shift+F10 / m)', () => {
         render(<Sequencer {...defaultProps} />);
         fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: 'ContextMenu' });
         expect(mockSetMenuState).toHaveBeenCalledWith(expect.objectContaining({
-            isOpen: true, source: 'keyboard', row: 0, col: 0, activeOption: 'repeat'
+            isOpen: true, source: 'menu', row: 0, col: 0, activeOption: 'repeat'
         }));
 
         mockSetMenuState.mockClear();
         fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: 'F10', shiftKey: true });
-        expect(mockSetMenuState).toHaveBeenCalledWith(expect.objectContaining({
-            isOpen: true, source: 'keyboard'
-        }));
+        expect(mockSetMenuState).toHaveBeenCalledWith(expect.objectContaining({ isOpen: true, source: 'menu' }));
+
+        mockSetMenuState.mockClear();
+        fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: 'm' });
+        expect(mockSetMenuState).toHaveBeenCalledWith(expect.objectContaining({ isOpen: true, source: 'menu' }));
+    });
+
+    it('leaves browser/OS chords alone (modified keys are not grid shortcuts)', () => {
+        render(<Sequencer {...defaultProps} />);
+        fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: 'm', ctrlKey: true });
+        fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: 'm', altKey: true });
+        expect(mockSetMenuState).not.toHaveBeenCalled();
+        fireEvent.keyDown(screen.getByTestId('cell-0-0'), { key: ' ', ctrlKey: true });
+        expect(defaultProps.toggleStep).not.toHaveBeenCalled();
     });
 
     it('does not toggle a step in a measure pending deletion (faded)', () => {

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: ISC
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FILL_MODES } from '../data/sequencerConfig';
 
 export function useSequencerSelection({ onBulkUpdate }) {
@@ -13,7 +13,7 @@ export function useSequencerSelection({ onBulkUpdate }) {
         row: null,
         col: null,
         activeOption: null,
-        source: 'pointer' // 'pointer' (long-press drag) | 'keyboard'
+        source: 'drag' // 'drag' (touch long-press) | 'menu' (right-click / keyboard)
     });
     
     const menuRef = useRef(null);
@@ -28,12 +28,12 @@ export function useSequencerSelection({ onBulkUpdate }) {
         bulkUpdateStepRef.current = onBulkUpdate;
     }, [onBulkUpdate]);
 
-    // Keyboard-opened menu: arrow keys cycle the option, Enter/Space commit,
-    // Escape/Tab cancel. Capture phase + stopImmediatePropagation so the grid's
-    // own keydown handler doesn't also act on these keys. Focus stays on the
-    // originating pad throughout (the menu is a non-focusable overlay).
+    // 'menu' mode (right-click or keyboard): arrow keys cycle the option,
+    // Enter/Space commit, Escape/Tab cancel. Capture phase + stopImmediatePropagation
+    // so the grid's own keydown handler doesn't also act on these keys. Focus is on
+    // the menu itself (Sequencer moves it there), so these fire while it's open.
     useEffect(() => {
-        if (!menuState.isOpen || menuState.source !== 'keyboard') return;
+        if (!menuState.isOpen || menuState.source !== 'menu') return;
 
         const handleKey = (e) => {
             const current = menuStateRef.current;
@@ -67,8 +67,10 @@ export function useSequencerSelection({ onBulkUpdate }) {
         return () => window.removeEventListener('keydown', handleKey, true);
     }, [menuState.isOpen, menuState.source]);
 
+    // 'drag' mode (touch/pen long-press): track the pointer over the options and
+    // commit whichever it's released on.
     useEffect(() => {
-        if (!menuState.isOpen || menuState.source === 'keyboard') return;
+        if (!menuState.isOpen || menuState.source !== 'drag') return;
 
         const handleMove = (e) => {
             e.stopImmediatePropagation();
@@ -120,9 +122,53 @@ export function useSequencerSelection({ onBulkUpdate }) {
         };
     }, [menuState.isOpen, menuState.source]);
 
+    // 'menu' mode is persistent: a pointer press outside it dismisses it. Attached
+    // on the next tick so the very click that opened it (the right-press) doesn't
+    // immediately close it. Scrolling dismisses too (like a native context menu):
+    // the menu is position:fixed over a scrollable grid, so any scroll leaves it
+    // floating over pads it no longer belongs to — its row/col would then commit
+    // a fill nowhere near the visible menu. Scroll events don't bubble, hence the
+    // capture-phase document listener.
+    useEffect(() => {
+        if (!menuState.isOpen || menuState.source !== 'menu') return;
+        const close = () => setMenuState(prev => ({ ...prev, isOpen: false }));
+        const handleDown = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                close();
+            }
+        };
+        const id = setTimeout(() => {
+            document.addEventListener('mousedown', handleDown);
+            document.addEventListener('touchstart', handleDown);
+        }, 0);
+        document.addEventListener('wheel', close, { capture: true, passive: true });
+        document.addEventListener('scroll', close, { capture: true, passive: true });
+        return () => {
+            clearTimeout(id);
+            document.removeEventListener('mousedown', handleDown);
+            document.removeEventListener('touchstart', handleDown);
+            document.removeEventListener('wheel', close, { capture: true });
+            document.removeEventListener('scroll', close, { capture: true });
+        };
+    }, [menuState.isOpen, menuState.source]);
+
+    // Commit an option (a click in 'menu' mode) and close.
+    const selectOption = useCallback((optionId) => {
+        const current = menuStateRef.current;
+        if (optionId) bulkUpdateStepRef.current(current.row, current.col, optionId);
+        setMenuState(prev => ({ ...prev, isOpen: false }));
+    }, []);
+
+    // Highlight an option under the pointer (hover in 'menu' mode).
+    const hoverOption = useCallback((optionId) => {
+        setMenuState(prev => (prev.activeOption === optionId ? prev : { ...prev, activeOption: optionId }));
+    }, []);
+
     return {
         menuState,
         setMenuState,
-        menuRef
+        menuRef,
+        selectOption,
+        hoverOption,
     };
 }

@@ -9,14 +9,15 @@ import { useCallback, useEffect, useRef } from 'react';
 const ACTION_DELAY_MS = 200;
 
 // Global keyboard shortcuts for the sequencer:
-//   Space / p  play / pause     ?  help
+//   p      play / pause         ?  help
 //   - / =  BPM down / up        z  cycle zoom (debounced)
 //   s      toggle auto-scroll (debounced)   h  humanize toggle
 //   Esc    close modals
-// (p is the single-key play/pause; Space also plays but yields to focused buttons.)
+// (Space is deliberately unbound here — it keeps its native/ARIA roles:
+// activating a focused button, toggling the focused pad checkbox.)
 // Ignored while typing in form controls. The single-character shortcuts can be
 // turned off via `singleKeyEnabled` (WCAG 2.1.4 — speech-input users fire them
-// constantly); Space and Escape stay live. Pure side-effect hook (no return).
+// constantly); Escape stays live. Pure side-effect hook (no return).
 export function useKeyboardShortcuts({
     togglePlay,
     setBpmInput,
@@ -72,16 +73,9 @@ export function useKeyboardShortcuts({
             const tag = e.target?.tagName?.toLowerCase();
             if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return;
 
-            // Space => play / pause — except on a focused button or link, where
-            // Space is the standard activation key: preventDefault on this
-            // keydown swallows the element's click-on-keyup (verified in
-            // Chromium), which would make Space activate nothing but playback.
-            if (e.code === 'Space' || e.key === ' ') {
-                if (tag === 'button' || tag === 'a') return;
-                e.preventDefault();
-                togglePlay?.();
-                return;
-            }
+            // Space is deliberately NOT bound here — it stays with its native/ARIA
+            // roles (activate a focused button, toggle a focused pad checkbox).
+            // Play/pause is `p`, which no control swallows.
 
             // Escape stays live regardless of the single-key preference — it is
             // not a printable character, so 2.1.4 doesn't apply to it. Routed

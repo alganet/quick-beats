@@ -28,7 +28,7 @@ describe('useSequencerSelection', () => {
             row: null,
             col: null,
             activeOption: null,
-            source: 'pointer'
+            source: 'drag'
         });
     });
 
@@ -79,7 +79,7 @@ describe('useSequencerSelection', () => {
         act(() => {
             result.current.setMenuState({
                 isOpen: true,
-                x: 0, y: 0, row: 0, col: 0, activeOption: null
+                x: 0, y: 0, row: 0, col: 0, activeOption: null, source: 'drag'
             });
         });
 
@@ -123,7 +123,7 @@ describe('useSequencerSelection', () => {
         act(() => {
             result.current.setMenuState({
                 isOpen: true,
-                x: 0, y: 0, row: 1, col: 2, activeOption: 'repeat'
+                x: 0, y: 0, row: 1, col: 2, activeOption: 'repeat', source: 'drag'
             });
         });
 
@@ -150,7 +150,7 @@ describe('useSequencerSelection', () => {
         act(() => {
             result.current.setMenuState({
                 isOpen: true,
-                x: 0, y: 0, row: 0, col: 0, activeOption: null
+                x: 0, y: 0, row: 0, col: 0, activeOption: null, source: 'drag'
             });
         });
 
@@ -174,7 +174,7 @@ describe('useSequencerSelection', () => {
         act(() => {
             result.current.setMenuState({
                 isOpen: true,
-                x: 0, y: 0, row: 2, col: 3, activeOption: 'clear'
+                x: 0, y: 0, row: 2, col: 3, activeOption: 'clear', source: 'drag'
             });
         });
 
@@ -193,7 +193,7 @@ describe('useSequencerSelection', () => {
         act(() => {
             result.current.setMenuState({
                 isOpen: true,
-                x: 0, y: 0, row: 0, col: 0, activeOption: 'repeat'
+                x: 0, y: 0, row: 0, col: 0, activeOption: 'repeat', source: 'drag'
             });
         });
 
@@ -205,11 +205,11 @@ describe('useSequencerSelection', () => {
         expect(result.current.menuState.isOpen).toBe(false);
     });
 
-    describe('keyboard-opened menu (source: keyboard)', () => {
+    describe('keyboard-opened menu (source: menu)', () => {
         const openKeyboard = (result, opts = {}) => act(() => {
             result.current.setMenuState({
                 isOpen: true, x: 0, y: 0, row: 0, col: 0,
-                activeOption: 'repeat', source: 'keyboard', ...opts
+                activeOption: 'repeat', source: 'menu', ...opts
             });
         });
 
@@ -252,6 +252,27 @@ describe('useSequencerSelection', () => {
             openKeyboard(result);
             expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
             expect(addEventListenerSpy).not.toHaveBeenCalledWith('mousemove', expect.any(Function), { passive: false });
+        });
+
+        it('dismisses without committing when the grid scrolls', () => {
+            // The menu is position:fixed: a scroll leaves it floating over pads
+            // it no longer belongs to, and its stored row/col would commit a
+            // fill nowhere near the visible menu. Native menus close on scroll.
+            const onBulkUpdate = vi.fn();
+            const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate }));
+            openKeyboard(result);
+
+            act(() => { document.dispatchEvent(new Event('scroll')); });
+            expect(result.current.menuState.isOpen).toBe(false);
+            expect(onBulkUpdate).not.toHaveBeenCalled();
+        });
+
+        it('dismisses on a wheel scroll anywhere', () => {
+            const { result } = renderHook(() => useSequencerSelection({ onBulkUpdate: vi.fn() }));
+            openKeyboard(result);
+
+            act(() => { document.dispatchEvent(new Event('wheel')); });
+            expect(result.current.menuState.isOpen).toBe(false);
         });
     });
 });

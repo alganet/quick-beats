@@ -23,8 +23,7 @@ export function InstrumentRow({
     zoom,
     visibleRange,
     focusedCol = -1,
-    onFocusCell,
-    menuCol = -1
+    onFocusCell
 }) {
     const config = ZOOM_CONFIG[zoom];
     const start = visibleRange?.start ?? 0;
@@ -73,7 +72,6 @@ export function InstrumentRow({
                             faded={pendingDelete === measureIdx}
                             isFocused={focusedCol === colIdx}
                             onFocusCell={onFocusCell}
-                            menuOpen={menuCol === colIdx}
                         />
                     )
                 })}

@@ -10,7 +10,6 @@ import ContextMenu from "./ContextMenu";
 import { useSequencerSelection } from "../hooks/useSequencerSelection";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useFitZoom } from "../hooks/useFitZoom";
-import { useInputModality } from "../hooks/useInputModality";
 import { SequencerHeader } from "./SequencerHeader";
 import { MemoizedInstrumentRow } from "./InstrumentRow";
 import { MeasureControls } from "./MeasureControls";
@@ -37,16 +36,11 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
     // playback auto-scroll.
     const [focusedCell, setFocusedCell] = useState({ row: 0, col: 0 });
     const navFocusRef = useRef(false);
-    // Whether the focused pad was reached by keyboard (Tab/arrows) vs pointer —
-    // the :focus-visible distinction. Drives "Smart Space": Space toggles a
-    // keyboard-focused pad but falls through to global play/pause otherwise.
-    const inputModalityRef = useInputModality();
-    const focusViaKeyboardRef = useRef(false);
     // True while focus is inside the grid. Used to keep the focused cell rendered
     // (see renderRange) so a scroll can't window it out and drop focus to <body>.
     const [gridHasFocus, setGridHasFocus] = useState(false);
 
-    const { menuState, setMenuState, menuRef } = useSequencerSelection({ onBulkUpdate: bulkUpdateStep });
+    const { menuState, setMenuState, menuRef, selectOption, hoverOption } = useSequencerSelection({ onBulkUpdate: bulkUpdateStep });
     
     // Auto-scroll hook
     const { playheadOffRight, playheadOffLeft, handleWheel, handleTouchStart, handleTouchMove } = useAutoScroll({
@@ -194,14 +188,14 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
         setFocusedCell((prev) => (prev.row === r && prev.col === c ? prev : { row: r, col: c }));
     }, [rowCount, stepCount]);
 
-    // Keep the roving stop in sync when a pad is focused, recording whether the
-    // focus arrived via keyboard or pointer (used by the Space handler below).
+    // Keep the roving stop in sync when a pad is focused.
     const handleFocusCell = useCallback((row, col) => {
-        focusViaKeyboardRef.current = inputModalityRef.current === 'keyboard';
         setFocusedCell((prev) => (prev.row === row && prev.col === col ? prev : { row, col }));
-    }, [inputModalityRef]);
+    }, []);
 
-    // Open the bulk-fill menu for a cell from the keyboard (ContextMenu/Shift+F10).
+    // Open the bulk-fill menu for a cell from the keyboard (ContextMenu / Shift+F10
+    // / m). 'menu' mode takes focus and is arrow- and click-navigable — the same
+    // mode a right-click opens.
     const openFillMenu = useCallback((cell, row, col) => {
         const rect = cell.getBoundingClientRect();
         setMenuState({
@@ -211,7 +205,7 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
             row,
             col,
             activeOption: 'repeat',
-            source: 'keyboard',
+            source: 'menu',
         });
     }, [setMenuState]);
 
@@ -225,6 +219,10 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
         // the mouse); mirror that for the keyboard — navigation still works, but
         // editing/menu actions are suppressed.
         const faded = pendingDelete === Math.floor(col / stepsPerMeasure);
+        // Browser and OS chords (Alt+Left history nav, Ctrl+M, ...) are not ours
+        // to hijack; Ctrl only means something on Home/End (jump to first/last row).
+        if (e.altKey || e.metaKey) return;
+        if (e.ctrlKey && e.key !== 'Home' && e.key !== 'End') return;
         let handled = true;
         switch (e.key) {
             case 'ArrowRight': moveFocus(row, col + 1); break;
@@ -237,10 +235,9 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                 if (!faded) toggleStep(row, col);
                 break;
             case ' ':
-                // Smart Space: only a keyboard-focused pad consumes Space (ARIA
-                // checkbox toggle). A pointer-focused pad lets Space bubble to
-                // the global play/pause shortcut.
-                if (!focusViaKeyboardRef.current) { handled = false; break; }
+                // Space toggles the focused pad — the ARIA default for its
+                // role="checkbox". (Play/pause is `p`, so Space no longer has a
+                // second, conflicting meaning here.)
                 if (!faded) toggleStep(row, col);
                 break;
             case 'ContextMenu':
@@ -249,6 +246,12 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
             case 'F10':
                 if (e.shiftKey && !faded) openFillMenu(cell, row, col);
                 else if (!e.shiftKey) handled = false;
+                break;
+            // 'm' as a keyboard trigger for keyboards without a dedicated Menu key.
+            case 'm':
+            case 'M':
+                if (!faded) openFillMenu(cell, row, col);
+                else handled = false;
                 break;
             default: handled = false;
         }
@@ -260,22 +263,26 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
         }
     }, [menuState.isOpen, moveFocus, openFillMenu, pendingDelete, rowCount, stepsPerMeasure, stepCount, toggleStep]);
 
-    // A keyboard-opened fill menu takes focus (so its role="menu" +
-    // aria-activedescendant announce the active option natively); on close, focus
-    // returns to the pad it opened from. Only when focus fell to <body> — i.e. the
-    // menu unmounted with nothing else grabbing focus (Escape / Enter commit) — is
-    // it restored; a Tab close intentionally moved focus onward, so leave it.
-    const menuWasKbdOpenRef = useRef(false);
+    // A 'menu'-mode fill menu (right-click or keyboard) takes focus, so its
+    // role="menu" + aria-activedescendant announce the active option natively; on
+    // close, focus returns to the pad it opened from. Only when focus fell to
+    // <body> — i.e. the menu unmounted with nothing else grabbing focus (Escape /
+    // Enter / click-select) — is it restored; a Tab close moved focus onward, leave it.
+    const menuWasMenuOpenRef = useRef(false);
     useEffect(() => {
-        const kbdOpen = menuState.isOpen && menuState.source === 'keyboard';
-        const wasOpen = menuWasKbdOpenRef.current;
-        menuWasKbdOpenRef.current = kbdOpen;
-        if (kbdOpen && !wasOpen) {
+        const menuOpen = menuState.isOpen && menuState.source === 'menu';
+        const wasOpen = menuWasMenuOpenRef.current;
+        menuWasMenuOpenRef.current = menuOpen;
+        if (menuOpen && !wasOpen) {
             menuRef.current?.focus();
-        } else if (!kbdOpen && wasOpen && document.activeElement === document.body) {
-            scrollContainerRef.current
-                ?.querySelector(`[data-row="${menuState.row}"][data-col="${menuState.col}"]`)
-                ?.focus();
+        } else if (!menuOpen && wasOpen && document.activeElement === document.body) {
+            // The origin pad can have been windowed out of the DOM (a scroll
+            // dismissed the menu); fall back to any rendered pad in its row so
+            // keyboard focus never silently drops to <body>.
+            const container = scrollContainerRef.current;
+            const target = container?.querySelector(`[data-row="${menuState.row}"][data-col="${menuState.col}"]`)
+                ?? container?.querySelector(`[data-row="${menuState.row}"][data-col]`);
+            target?.focus();
         }
     }, [menuState.isOpen, menuState.source, menuState.row, menuState.col, menuRef]);
 
@@ -302,6 +309,31 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
         }
     }, [focusRow, focusCol, visibleRange, grouping, zoom]);
 
+    // Enter the grid on an arrow key when nothing else is focused. Without this
+    // the arrows only navigate once you've already clicked or tabbed into a pad;
+    // this lets a keyboard user drop straight in. Gated on document.body focus so
+    // it never steals arrows from a focused control — and a screen reader in
+    // browse mode intercepts arrows before they reach us, so it stays out of the
+    // way there too. The pressed arrow just enters at the roving cell; the grid's
+    // own delegation handles every move after that.
+    const rovingCellRef = useRef({ row: focusRow, col: focusCol });
+    useEffect(() => { rovingCellRef.current = { row: focusRow, col: focusCol }; }, [focusRow, focusCol]);
+    useEffect(() => {
+        const enterOnArrow = (e) => {
+            if (document.activeElement !== document.body) return;
+            // Modified arrows are browser/OS chords (Alt+Left is history Back).
+            if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+            if (!/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
+            const { row, col } = rovingCellRef.current;
+            const el = scrollContainerRef.current?.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            if (!el) return;
+            e.preventDefault();
+            el.focus();
+        };
+        window.addEventListener('keydown', enterOnArrow);
+        return () => window.removeEventListener('keydown', enterOnArrow);
+    }, []);
+
     return (
         <div className="flex-1 flex flex-col overflow-hidden relative select-none bg-surface-1">
             {menuState.isOpen && (
@@ -312,6 +344,9 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                     activeOption={menuState.activeOption}
                     grouping={grouping}
                     colInGroup={menuState.col % grouping}
+                    clickable={menuState.source === 'menu'}
+                    onSelect={selectOption}
+                    onHover={hoverOption}
                 />
             )}
             {/* Playhead off-screen indicators - Fixed at top corners */}
@@ -371,10 +406,6 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                                     onKeyDown={handleGridKeyDown}
                                     onFocus={() => setGridHasFocus(true)}
                                     onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setGridHasFocus(false); }}
-                                    // A pointer press inside the grid is pointer intent even when
-                                    // it lands on the already-focused pad (which fires no new focus
-                                    // event) — so Space falls through to play, not toggle.
-                                    onPointerDown={() => { focusViaKeyboardRef.current = false; }}
                                 >
                                 {INSTRUMENTS.map((instrument, rowIdx) => (
                                     <MemoizedInstrumentRow
@@ -394,11 +425,6 @@ export default function Sequencer({ isPlaying, togglePlay, grid, humanizedMask, 
                                         visibleRange={renderRange}
                                         focusedCol={focusRow === rowIdx ? focusCol : -1}
                                         onFocusCell={handleFocusCell}
-                                        // Only the row holding the open fill menu gets a live
-                                        // menu column, so its pad can advertise the open menu
-                                        // (aria-expanded); every other row stays -1 and memo
-                                        // skips it.
-                                        menuCol={menuState.isOpen && menuState.row === rowIdx ? menuState.col : -1}
                                     />
                                 ))}
                                 </div>
