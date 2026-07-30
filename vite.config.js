@@ -56,11 +56,27 @@ const shortCommitSha = () => {
   }
 }
 
+// kit.js writes sample paths root-relative ("/samples/..."); both consumers below
+// need them relative to a base or a service worker scope instead.
+const relativeSamplePath = (path) => (path.startsWith('/') ? path.slice(1) : path)
+
+// Every sample the app can actually play, across all kits. public/samples/ carries
+// ~49 MB of round-robin layers and articulations nothing references, so the service
+// worker's precache list is derived from kit.js rather than from the directory —
+// an instrument present in the library but not wired into a kit stays uncached.
+// Deduped because two kits are free to share a file.
+const wiredSamplePaths = () =>
+  [...new Set(Object.values(KITS).flatMap((kit) => Object.values(kit.samples)))].map(relativeSamplePath)
+
 // Inject <link rel="prefetch"> for the default kit's samples into index.html so
 // a static host (GitHub Pages — no Link: preload headers available) starts
 // downloading them during HTML parse, in parallel with the JS bundle, instead
 // of waiting for React to mount and fire the fetch. Sourced from kit.js so it
 // stays in sync, and uses the resolved base so it's correct under /quick-beats/.
+//
+// Deliberately the default kit only, even though the SW precaches every wired
+// kit: these tags compete for bandwidth during first paint, which is a different
+// problem from surviving offline.
 const prefetchKitSamples = () => {
   let base = '/'
   return {
@@ -71,7 +87,7 @@ const prefetchKitSamples = () => {
       if (!kit) return []
       return Object.values(kit.samples).map((path) => ({
         tag: 'link',
-        attrs: { rel: 'prefetch', href: base + (path.startsWith('/') ? path.slice(1) : path) },
+        attrs: { rel: 'prefetch', href: base + relativeSamplePath(path) },
         injectTo: 'head',
       }))
     },
@@ -105,6 +121,10 @@ const stampServiceWorkerVersion = (version) => {
       const src = readFileSync(swPath, 'utf-8')
         .replaceAll('__APP_VERSION__', version)
         .replace('/* __BUILD_ASSETS__ */', buildAssets.map((file) => JSON.stringify(file)).join(', '))
+        // Samples live in public/ and are copied verbatim, so they never appear
+        // in the Rollup bundle above — the list comes from kit.js instead. See
+        // SAMPLE_ASSETS in public/sw.js for why they have to be precached.
+        .replace('/* __SAMPLE_ASSETS__ */', wiredSamplePaths().map((path) => JSON.stringify(path)).join(', '))
       writeFileSync(swPath, src)
     },
   }

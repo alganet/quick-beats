@@ -9,7 +9,7 @@
 // importing it, for two reasons. It is a classic worker script with no imports
 // and no exports — there is nothing to import — and evaluating it gives a fresh
 // worker per test, which matters: sw.js carries mutable module state
-// (putsSinceTrim, seeded at the trim threshold, and the shellUrlSet memo) that a
+// (putsSinceTrim, seeded at the trim threshold, and the precachedUrlSet memo) that a
 // cached ES module would share across tests and make untestable.
 //
 // Known cost: v8 cannot instrument code evaluated this way, so the service
@@ -125,6 +125,7 @@ export function loadServiceWorker({
     scope = 'https://example.test/quick-beats/',
     version = '1.7.1',
     buildAssets = [],
+    sampleAssets = [],
     fetch: fetchImpl,
     // Escape hatch for proving a test can fail: mutate the source before it runs.
     transformSource = (src) => src,
@@ -138,7 +139,8 @@ export function loadServiceWorker({
     // (see vite.config.js), so these tests exercise the worker as it ships.
     const stamped = rawSource
         .replaceAll('__APP_VERSION__', version)
-        .replace('/* __BUILD_ASSETS__ */', buildAssets.map((file) => JSON.stringify(file)).join(', '));
+        .replace('/* __BUILD_ASSETS__ */', buildAssets.map((file) => JSON.stringify(file)).join(', '))
+        .replace('/* __SAMPLE_ASSETS__ */', sampleAssets.map((file) => JSON.stringify(file)).join(', '));
 
     const listeners = new Map();
     const caches = new StubCacheStorage();
@@ -164,7 +166,7 @@ export function loadServiceWorker({
         'fetch',
         'console',
         `${transformSource(stamped)}
-        return { SHELL_CACHE, RUNTIME_CACHE, SHELL_ASSETS, BUILD_ASSETS, RUNTIME_MAX_ENTRIES, TRIM_EVERY_N_PUTS };`,
+        return { SHELL_CACHE, RUNTIME_CACHE, SHELL_ASSETS, BUILD_ASSETS, SAMPLE_ASSETS, PRECACHED_ASSETS, RUNTIME_MAX_ENTRIES, TRIM_EVERY_N_PUTS };`,
     )(self, caches, fetchMock, consoleStub);
 
     const scoped = (path) => new URL(path, scope).href;

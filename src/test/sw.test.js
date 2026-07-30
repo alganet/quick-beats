@@ -6,11 +6,23 @@
 // — a blank launch, a broken update, an unbounded cache — so nearly every test
 // here is a regression test rather than a specification.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { loadServiceWorker, okResponse, navigateRequest } from './serviceWorkerHarness';
 
+// The stamping half of the build-time contract. Read as text rather than
+// imported: vite.config.js is an ESM module that pulls in vite plugins, and the
+// assertion is about the literal placeholder strings anyway.
+const VITE_CONFIG = readFileSync(join(import.meta.dirname, '../../vite.config.js'), 'utf-8');
+
 const SCOPE = 'https://example.test/quick-beats/';
 const ASSET = 'assets/index-abc123.js';
+// A wired sample (the `-1` layer kit.js references) and an unwired sibling from
+// the same directory — the library ships five round-robin layers per articulation
+// and the app plays only the first.
+const SAMPLE = 'samples/RED_ZEPPELIN_2023_repack/36-Ludwig-26-Kick-1.wav';
+const UNWIRED_SAMPLE = 'samples/RED_ZEPPELIN_2023_repack/36-Ludwig-26-Kick-2.wav';
 
 // cacheFirst deliberately does not await its cache.put or its trim — the
 // response goes back to the page first. Tests that assert on the cache have to
@@ -21,13 +33,24 @@ const varying = (header) => vi.fn(() => Promise.resolve(okResponse('body', { hea
 const corsRequest = (url) => new Request(url, { headers: { Origin: 'https://example.test' } });
 
 describe('build-time placeholders', () => {
+    // The placeholder names are a contract between two files, so both ends are
+    // asserted. Checking only sw.js catches the harmless half — a consistent
+    // rename in both files, which would fail here as a false alarm — and misses
+    // the harmful half entirely: drop or misspell a substitution in
+    // vite.config.js alone and the suite stays green while the build emits an
+    // unstamped worker. Every release would then share one cache name and serve
+    // the previous version's assets forever (__APP_VERSION__), or ship an empty
+    // precache list — which still installs, still works online, and only fails
+    // offline, exactly the bug the precache exists to prevent.
+    const PLACEHOLDERS = ['__APP_VERSION__', '/* __BUILD_ASSETS__ */', '/* __SAMPLE_ASSETS__ */'];
+
     it('still ships the placeholders stampServiceWorkerVersion substitutes', () => {
-        // Renaming either in sw.js without updating vite.config.js would emit an
-        // unstamped worker: every release would share one cache name and serve
-        // the previous version's assets forever.
         const { rawSource } = loadServiceWorker();
-        expect(rawSource).toContain('__APP_VERSION__');
-        expect(rawSource).toContain('/* __BUILD_ASSETS__ */');
+        for (const placeholder of PLACEHOLDERS) expect(rawSource).toContain(placeholder);
+    });
+
+    it('is stamped by vite.config.js under exactly those names', () => {
+        for (const placeholder of PLACEHOLDERS) expect(VITE_CONFIG).toContain(placeholder);
     });
 
     it('names its caches after the stamped version', () => {
@@ -90,15 +113,18 @@ describe('install', () => {
         expect(shell.urls()).toHaveLength(0);
     });
 
-    it("forces cache: 'reload' for shell assets but not for hashed build assets", async () => {
+    it("forces cache: 'reload' for shell assets but not for build assets or samples", async () => {
         // The unhashed entries can go stale, so a reinstall must bypass the HTTP
         // cache. Forcing it on the hashed bundle would re-download everything the
-        // page just fetched, over the same slow connection the install must survive.
-        const sw = loadServiceWorker({ buildAssets: [ASSET] });
+        // page just fetched, over the same slow connection the install must survive
+        // — and forcing it on the samples would re-download the kit the page
+        // prefetched moments ago, which is most of this install's bytes.
+        const sw = loadServiceWorker({ buildAssets: [ASSET], sampleAssets: [SAMPLE] });
         await sw.dispatch('install');
 
         expect(sw.fetch).toHaveBeenCalledWith(`${SCOPE}index.html`, { cache: 'reload' });
         expect(sw.fetch).toHaveBeenCalledWith(`${SCOPE}${ASSET}`, undefined);
+        expect(sw.fetch).toHaveBeenCalledWith(`${SCOPE}${SAMPLE}`, undefined);
     });
 
     it('precaches the hashed build assets alongside the shell', async () => {
@@ -112,6 +138,31 @@ describe('install', () => {
         const shell = await sw.caches.open(sw.SHELL_CACHE);
         expect(shell.urls()).toContain(`${SCOPE}${ASSET}`);
         expect(shell.urls()).toContain(`${SCOPE}assets/index-def456.css`);
+    });
+
+    it('precaches the wired kit samples alongside the shell', async () => {
+        // Same reason as the build assets above: the SW registers on window load,
+        // after useSamplePreload has already fired its fetches, so on the visit
+        // that installs the worker those requests are never intercepted. Left to
+        // runtime caching, an app installed and taken offline before a second
+        // visit renders fine but cannot make a sound.
+        const sw = loadServiceWorker({ sampleAssets: [SAMPLE] });
+        await sw.dispatch('install');
+
+        const shell = await sw.caches.open(sw.SHELL_CACHE);
+        expect(shell.urls()).toContain(`${SCOPE}${SAMPLE}`);
+    });
+
+    it('precaches only the samples it was stamped with', async () => {
+        // The list comes from kit.js, not from a glob over public/samples/ — which
+        // ships ~49 MB of round-robin layers and articulations nothing plays. An
+        // instrument in the library but not wired into a kit must stay uncached.
+        const sw = loadServiceWorker({ sampleAssets: [SAMPLE] });
+        await sw.dispatch('install');
+
+        const shell = await sw.caches.open(sw.SHELL_CACHE);
+        expect(shell.urls()).not.toContain(`${SCOPE}${UNWIRED_SAMPLE}`);
+        expect(shell.urls()).toHaveLength(sw.SHELL_ASSETS.length + 1);
     });
 
     it('never calls skipWaiting', async () => {
@@ -240,10 +291,41 @@ describe('cacheFirst', () => {
         expect(sw.fetch).not.toHaveBeenCalled();
     });
 
-    it('does not probe the shell cache for samples', async () => {
-        // Samples are never precached, so a shell lookup would be pure overhead
-        // on the hottest path in the app — dozens of requests during the kit
-        // prefetch storm, on a worker thread that is already the bottleneck.
+    it('serves a precached sample from the shell without a duplicate runtime copy', async () => {
+        // The offline-audio guarantee: a wired sample answers from the precache
+        // with no network in the path at all.
+        const sw = loadServiceWorker({ sampleAssets: [SAMPLE] });
+        await sw.boot();
+        sw.fetch.mockClear();
+
+        await sw.dispatch('fetch', { request: new Request(sw.scoped(SAMPLE)) });
+        await flush();
+
+        const runtime = await sw.caches.open(sw.RUNTIME_CACHE);
+        expect(runtime.urls()).toHaveLength(0);
+        expect(sw.fetch).not.toHaveBeenCalled();
+    });
+
+    it('sends an unwired sample to the runtime cache, not the shell', async () => {
+        // Precache membership is per-URL, not per-directory: a sibling layer in a
+        // precached kit's folder must still be an on-demand, trimmable entry, or
+        // the shell cache inherits all ~49 MB of public/samples/.
+        const sw = loadServiceWorker({ sampleAssets: [SAMPLE] });
+        await sw.boot();
+
+        await sw.dispatch('fetch', { request: new Request(sw.scoped(UNWIRED_SAMPLE)) });
+        await flush();
+
+        const runtime = await sw.caches.open(sw.RUNTIME_CACHE);
+        expect(runtime.urls()).toEqual([sw.scoped(UNWIRED_SAMPLE)]);
+        const shell = await sw.caches.open(sw.SHELL_CACHE);
+        expect(shell.urls()).not.toContain(sw.scoped(UNWIRED_SAMPLE));
+    });
+
+    it('does not probe the shell cache for an unprecached runtime asset', async () => {
+        // Routing is decided by a synchronous Set lookup, so the model weights and
+        // the unwired sample layers never pay for a caches.open + match on the
+        // hottest path in the app.
         const sw = loadServiceWorker();
         await sw.boot();
 

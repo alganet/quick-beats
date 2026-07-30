@@ -16,14 +16,16 @@ const CACHE_VERSION = '__APP_VERSION__';
 const SHELL_CACHE = `qb-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `qb-runtime-${CACHE_VERSION}`;
 
-// Cap the runtime cache so loading both kits (~49 MB of wavs) plus the model
-// weights can't grow it without bound. Oldest entries are evicted first.
+// Cap the runtime cache so the model weights and the unwired sample layers
+// (public/samples/ ships ~49 MB; only the 14 files in SAMPLE_ASSETS are wired,
+// and those are precached instead) can't grow it without bound. Oldest entries
+// are evicted first.
 const RUNTIME_MAX_ENTRIES = 400;
 
 // Scanning 400 cache keys on every put thrashes the worker thread exactly when
-// it is busiest — the kit prefetch storm on first load is dozens of puts back to
-// back, and the worker is single-threaded, so that work delays whatever the page
-// is waiting on. Amortise it: a burst can overshoot by at most this many entries.
+// it is busiest, and the worker is single-threaded, so that work delays whatever
+// the page is waiting on. Amortise it: a burst can overshoot by at most this
+// many entries.
 const TRIM_EVERY_N_PUTS = 25;
 
 // Scope-relative shell assets. self.registration.scope is the absolute URL the
@@ -53,20 +55,46 @@ const SHELL_ASSETS = [
 // production builds.
 const BUILD_ASSETS = [/* __BUILD_ASSETS__ */];
 
+// The drum samples the app can actually play, injected by stampServiceWorkerVersion
+// from src/data/kit.js — the single source of truth for what is wired. That sourcing
+// is the whole point: public/samples/ carries 256 wavs (~49 MB) of round-robin layers
+// and articulations nothing references, so a directory glob would precache 47 MB the
+// app never asks for. The wired subset is 14 files, ~2.1 MB, and an instrument added
+// to the library but not to kit.js stays out of the cache by construction.
+//
+// They must be precached for the same reason BUILD_ASSETS must: the SW registers on
+// window load, after useSamplePreload has already fired its fetches, so on the visit
+// that installs the worker those requests are never intercepted. Left to runtime
+// caching, an app installed and taken offline before the second visit renders fine
+// but cannot make a sound. Precaching both kits (rather than just the default) is
+// ~0.75 MB more and buys offline kit switching.
+//
+// Living in SHELL_CACHE rather than RUNTIME_CACHE also exempts them from the
+// RUNTIME_MAX_ENTRIES trim, and means a version bump re-precaches them on install
+// instead of evicting them with the rest of the old runtime cache.
+const SAMPLE_ASSETS = [/* __SAMPLE_ASSETS__ */];
+
 const scoped = (path) => new URL(path, self.registration.scope).href;
 
 // The two URLs the shell document is served at, tried in this order when a
 // navigation needs it.
 const SHELL_URLS = () => [scoped('index.html'), scoped('./')];
 
-// Membership of SHELL_ASSETS is a fixed question — the scope never changes for
-// the life of the worker — so resolve it once instead of rebuilding 8 URL
-// objects on every request that reaches the shell branch of the fetch handler.
-let shellUrlSet = null;
-const isShellUrl = (href) => {
-  shellUrlSet ??= new Set(SHELL_ASSETS.map(scoped));
-  return shellUrlSet.has(href);
+// Everything the install step stores in SHELL_CACHE. Membership is a fixed
+// question — the scope never changes for the life of the worker — so resolve it
+// once instead of rebuilding 25 URL objects on every request the fetch handler
+// has to classify.
+const PRECACHED_ASSETS = SHELL_ASSETS.concat(BUILD_ASSETS, SAMPLE_ASSETS);
+
+let precachedUrlSet = null;
+const isPrecached = (href) => {
+  precachedUrlSet ??= new Set(PRECACHED_ASSETS.map(scoped));
+  return precachedUrlSet.has(href);
 };
+
+// Whether a precache entry may be read from the HTTP cache instead of forced
+// over the network — see the `cache: 'reload'` reasoning in precache() below.
+const IMMUTABLE_ASSETS = new Set(BUILD_ASSETS.concat(SAMPLE_ASSETS));
 
 // Every read of our own caches ignores Vary, and it is load-bearing. Precache
 // entries are stored from a plain fetch inside the worker, but the page requests
@@ -94,7 +122,13 @@ async function precache(cache, paths) {
       // bundle the page just fetched, over the same slow connection this install
       // has to survive; their names change whenever their contents do, so the
       // HTTP cache can never hand back the wrong bytes.
-      const immutable = BUILD_ASSETS.includes(path);
+      //
+      // The samples get the same exemption for a different reason: their names
+      // are unhashed, but they are fixed recordings from a sample library and
+      // their bytes never change. Forcing a reload would re-download the kit the
+      // page prefetched moments ago (via the <link rel="prefetch"> tags and
+      // useSamplePreload), which is most of this install's bytes.
+      const immutable = IMMUTABLE_ASSETS.has(path);
       const response = await fetch(url, immutable ? undefined : { cache: 'reload' });
       if (!response.ok) throw new Error(`${response.status} for ${url}`);
       await cache.put(url, response);
@@ -112,7 +146,7 @@ self.addEventListener('install', (event) => {
   // — the update-path version of the same blank screen. Waiting means activation
   // happens only once every page on the old version is gone, so the purge below
   // is always safe and an update lands cleanly on the next launch.
-  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => precache(cache, SHELL_ASSETS.concat(BUILD_ASSETS))));
+  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => precache(cache, PRECACHED_ASSETS)));
 });
 
 self.addEventListener('activate', (event) => {
@@ -155,19 +189,14 @@ let putsSinceTrim = TRIM_EVERY_N_PUTS;
 // responses — audio elements issue Range requests that return 206 Partial
 // Content, which must never be cached or playback breaks on cache hits.
 //
-// checkShellFirst is for /assets/, the one path that can already be sitting in
-// the shell cache from the precache: without it the build assets get fetched a
-// second time into a duplicate runtime copy. Samples, models and wasm are never
-// precached, so probing the shell cache for them would be pure overhead on the
-// hottest path in the app — dozens of requests during the kit prefetch storm,
-// on a worker thread that is already the bottleneck.
-async function cacheFirst(request, cacheName, { checkShellFirst = false } = {}) {
-  if (checkShellFirst) {
-    const shell = await caches.open(SHELL_CACHE);
-    const precached = await shell.match(request, MATCH_OPTS);
-    if (precached) return precached;
-  }
-
+// Which cache a request belongs to is decided by isPrecached in the fetch
+// handler, not probed here. An earlier version searched SHELL_CACHE first for
+// /assets/ (the one path that could already be there from the precache) to avoid
+// a duplicate runtime copy; a synchronous Set lookup answers the same question
+// for every precached URL without the caches.open + match, which matters on the
+// hottest path in the app — dozens of sample requests during the kit prefetch
+// storm, on a worker thread that is already the bottleneck.
+async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request, MATCH_OPTS);
   if (cached) return cached;
@@ -226,16 +255,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Precache membership is checked first and wins: everything in SHELL_CACHE is
+  // served from there, so the shell extras (manifest, icons, logo) don't go to
+  // the network on an offline launch, and the build assets and wired samples
+  // never get a duplicate copy in the runtime cache. A precached URL whose entry
+  // failed to store simply misses and is fetched into SHELL_CACHE on first use.
+  if (isPrecached(url.href)) {
+    event.respondWith(cacheFirst(request, SHELL_CACHE));
+    return;
+  }
+
+  // Everything else large and immutable — the model weights, wasm, and the
+  // sample layers no kit references — is cached on demand under the entry cap.
   const { pathname } = url;
   const isRuntimeAsset = pathname.includes('/samples/') || pathname.includes('/models/') ||
     pathname.endsWith('.wasm') || pathname.includes('/assets/');
   if (isRuntimeAsset) {
-    // Only /assets/ overlaps the precache; the rest can skip the shell lookup.
-    event.respondWith(cacheFirst(request, RUNTIME_CACHE, { checkShellFirst: pathname.includes('/assets/') }));
-  } else if (isShellUrl(url.href)) {
-    // The rest of the shell — manifest, icons, logo — was precached but nothing
-    // ever served it, so an offline launch still went to the network for its
-    // manifest and got nothing. Anything precached is served from the cache.
-    event.respondWith(cacheFirst(request, SHELL_CACHE));
+    event.respondWith(cacheFirst(request, RUNTIME_CACHE));
   }
 });
